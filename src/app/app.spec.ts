@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Group, groupProgress, taskProgress } from './model';
+import { Game, Group, gameProgress, groupProgress, taskProgress } from './model';
 
 describe('progress', () => {
   it('counts checkboxes, completed counters and remaining entries', () => {
@@ -7,6 +7,26 @@ describe('progress', () => {
     expect(taskProgress({ id: 'b', name: 'Clears', kind: 'counter', value: 2, target: 5 })).toEqual({ done: 2, total: 5 });
     // 3 of 5 entries left means 2 have been used
     expect(taskProgress({ id: 'c', name: 'Entries', kind: 'remaining', value: 3, target: 5 })).toEqual({ done: 2, total: 5 });
+  });
+
+  it('includes character groups in the game total', () => {
+    const group = (done: boolean): Group => ({
+      id: 'x',
+      name: 'Dailies',
+      collapsed: false,
+      tasks: [{ id: 't', name: 'D1', kind: 'check', checked: done }],
+    });
+    const game: Game = {
+      id: 'g',
+      name: 'Game',
+      collapsed: false,
+      groups: [group(true)],
+      characters: [
+        { id: 'a', name: 'Main', collapsed: false, groups: [group(true)] },
+        { id: 'b', name: 'Alt', collapsed: false, groups: [group(false)] },
+      ],
+    };
+    expect(gameProgress(game)).toEqual({ done: 2, total: 3 });
   });
 
   it('sums a boss list into a group total', () => {

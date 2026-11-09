@@ -1,7 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, Injector, afterNextRender, inject, signal } from '@angular/core';
 import { QuestStore } from './quest-store';
-import { Task, TaskKind, gameProgress, groupProgress, taskProgress } from './model';
+import { Game, Task, TaskKind, characterProgress, gameProgress, groupProgress, taskProgress } from './model';
 
 @Component({
   selector: 'qt-board',
@@ -23,6 +23,10 @@ export class Board {
   protected readonly gameProgress = gameProgress;
   protected readonly groupProgress = groupProgress;
   protected readonly taskProgress = taskProgress;
+  protected readonly characterProgress = characterProgress;
+
+  /** group whose "Copy to:" picker is open */
+  protected readonly copyingId = signal<string | null>(null);
 
   protected toggle(t: Task) {
     this.store.dispatch({ type: 'task.toggle', taskId: t.id });
@@ -57,8 +61,27 @@ export class Board {
     this.edit(await this.store.dispatch({ type: 'task.add', groupId, kind }));
   }
 
-  protected async addGroup(gameId: string) {
-    this.edit(await this.store.dispatch({ type: 'group.add', gameId }));
+  protected async addGroup(parentId: string) {
+    this.edit(await this.store.dispatch({ type: 'group.add', parentId }));
+  }
+
+  protected async addCharacter(gameId: string) {
+    this.edit(await this.store.dispatch({ type: 'character.add', gameId }));
+  }
+
+  protected async duplicateCharacter(characterId: string) {
+    this.edit(await this.store.dispatch({ type: 'character.duplicate', characterId }));
+  }
+
+  /** With no characters there's only one place to copy to, so skip the picker. */
+  protected copyGroup(groupId: string, game: Game) {
+    if (game.characters.length) this.copyingId.set(this.copyingId() === groupId ? null : groupId);
+    else this.duplicateGroup(groupId, game.id);
+  }
+
+  protected async duplicateGroup(groupId: string, targetId: string) {
+    this.copyingId.set(null);
+    this.edit(await this.store.dispatch({ type: 'group.duplicate', groupId, targetId }));
   }
 
   protected async addGame() {

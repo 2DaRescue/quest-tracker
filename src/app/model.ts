@@ -16,11 +16,19 @@ export interface Group {
   tasks: Task[];
 }
 
-export interface Game {
+export interface Character {
   id: string;
   name: string;
   collapsed: boolean;
   groups: Group[];
+}
+
+export interface Game {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  groups: Group[]; // shared across the account
+  characters: Character[];
 }
 
 export interface Settings {
@@ -41,7 +49,10 @@ export type Action =
   | { type: 'task.rename'; taskId: string; name: string }
   | { type: 'task.add'; groupId: string; kind: TaskKind }
   | { type: 'task.delete'; taskId: string }
-  | { type: 'group.add'; gameId: string }
+  | { type: 'group.add'; parentId: string }
+  | { type: 'group.duplicate'; groupId: string; targetId?: string }
+  | { type: 'character.add'; gameId: string }
+  | { type: 'character.duplicate'; characterId: string }
   | { type: 'group.resetNow'; groupId: string }
   | { type: 'game.add' }
   | { type: 'node.rename'; id: string; name: string }
@@ -92,4 +103,6 @@ export function sumProgress(items: Progress[]): Progress {
 }
 
 export const groupProgress = (g: Group) => sumProgress(g.tasks.map(taskProgress));
-export const gameProgress = (g: Game) => sumProgress(g.groups.map(groupProgress));
+export const characterProgress = (c: Character) => sumProgress(c.groups.map(groupProgress));
+export const gameProgress = (g: Game) =>
+  sumProgress([...g.groups.map(groupProgress), ...g.characters.map(characterProgress)]);

@@ -36,16 +36,62 @@
 }
 
 // Each level is indented under its parent, with a faint guide line.
-.group,
-.game > .add-link {
+.children {
   margin-left: 10px;
   padding-left: 8px;
   border-left: 1px solid var(--line);
 }
 
-.game > .add-link {
-  display: block;
-  padding-top: 4px;
+.children > .add-link,
+.add-links {
+  display: flex;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.character-row {
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--input);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px 22px;
+  font-size: 11px;
+  color: var(--muted);
+
+  button {
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--input);
+    color: var(--text);
+    &:hover {
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+    &.cancel {
+      background: none;
+      color: var(--muted);
+    }
+  }
 }
 
 .group-row {
