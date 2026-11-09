@@ -1,0 +1,21 @@
+<header class="titlebar" [class.drag]="mode === 'widget'">
+  <span class="logo">✓</span>
+  <span class="title">Quest Tracker</span>
+  <span class="spacer"></span>
+  @if (mode === 'widget') {
+    <button title="Change opacity" (click)="cycleOpacity()">◐</button>
+    <button title="Hide widget (reopen from the tray icon's menu)" (click)="hide()">×</button>
+  } @else {
+    <button [class.active]="pinned()" [title]="pinned() ? 'Unpin (closes when mouse leaves)' : 'Pin open'" (click)="togglePin()">
+      📌
+    </button>
+  }
+</header>
+
+<main>
+  @if (!store.available) {
+    <p class="notice">This UI runs inside the desktop app. Start it with <code>npm run dev</code>.</p>
+  } @else {
+    <qt-board />
+  }
+</main>

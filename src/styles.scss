@@ -1,0 +1,32 @@
+:root {
+  --bg: #1d1f27;
+  --text: #e8e6e1;
+  --muted: #9a9caa;
+  --line: #31343f;
+  --hover: #272a34;
+  --input: #2c2f3a;
+  --accent: #f5b43c;
+  --on-accent: #1d1f27;
+  --danger: #ef6b6b;
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.35 'Segoe UI', system-ui, sans-serif;
+}
+
+body.mode-popup {
+  border: 1px solid var(--line);
+  box-sizing: border-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}

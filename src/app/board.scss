@@ -1,0 +1,220 @@
+:host {
+  display: block;
+  padding: 4px 8px 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 4px;
+  border-radius: 6px;
+
+  &:hover {
+    background: var(--hover);
+    .hover-btn {
+      opacity: 1;
+    }
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.game + .game {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.game-row {
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+// Each level is indented under its parent, with a faint guide line.
+.group,
+.game > .add-link {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.game > .add-link {
+  display: block;
+  padding-top: 4px;
+}
+
+.group-row {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+.caret {
+  width: 12px;
+  font-size: 11px;
+  transition: transform 0.12s;
+  &.closed {
+    transform: rotate(-90deg);
+  }
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+  &.complete {
+    color: var(--accent);
+  }
+}
+
+.bar {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) calc(var(--pct) * 100%), var(--line) 0);
+}
+
+.tasks {
+  list-style: none;
+  margin: 0 0 0 10px;
+  padding: 0 0 0 8px;
+  border-left: 1px solid var(--line);
+}
+
+.task {
+  font-size: 13px;
+  &.done .name {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.value {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  small {
+    color: var(--muted);
+    margin-left: 2px;
+  }
+}
+
+input.target {
+  width: 2.4em;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  -moz-appearance: textfield;
+  cursor: text;
+  border-bottom: 1px dotted transparent;
+  &::-webkit-inner-spin-button {
+    display: none;
+  }
+  &:hover {
+    border-bottom-color: var(--muted);
+  }
+  &:focus {
+    outline: 1px solid var(--accent);
+    border-radius: 3px;
+  }
+}
+
+input.rename {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.step {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--input);
+  line-height: 1;
+  &:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+}
+
+.hover-btn {
+  opacity: 0;
+  width: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  &:hover {
+    color: var(--text);
+  }
+  &.danger:hover {
+    color: var(--danger);
+  }
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 4px 4px;
+  opacity: 0.45;
+  &:hover {
+    opacity: 1;
+  }
+  button:hover {
+    color: var(--accent);
+  }
+}
+
+.add-link {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.45;
+  padding: 2px 4px;
+  &:hover {
+    opacity: 1;
+    color: var(--accent);
+  }
+}
+
+.game-add {
+  padding-left: 4px;
+  margin-top: 8px;
+}

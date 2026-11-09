@@ -1,0 +1,92 @@
+<ng-template #nameTpl let-id="id" let-name="name" let-isTask="isTask">
+  @if (editingId() === id) {
+    <input
+      class="rename"
+      [value]="name"
+      maxlength="80"
+      (click)="$event.stopPropagation()"
+      (keydown.enter)="commit(id, isTask, $any($event.target).value)"
+      (keydown.escape)="cancel($event)"
+      (blur)="commit(id, isTask, $any($event.target).value)"
+    />
+  } @else {
+    <span class="name" title="Double-click to rename" (dblclick)="$event.stopPropagation(); edit(id)">{{ name }}</span>
+  }
+</ng-template>
+
+@if (store.state(); as s) {
+  @for (game of s.games; track game.id) {
+    @let gp = gameProgress(game);
+    <section class="game">
+      <div class="row game-row" (click)="collapse(game.id)">
+        <span class="caret" [class.closed]="game.collapsed">▾</span>
+        <ng-container *ngTemplateOutlet="nameTpl; context: { id: game.id, name: game.name, isTask: false }" />
+        <span class="spacer"></span>
+        <span class="count" [class.complete]="gp.total && gp.done === gp.total">{{ gp.done }}/{{ gp.total }}</span>
+        <button class="hover-btn danger" title="Delete game" (click)="$event.stopPropagation(); deleteNode(game.id, game.name, 'game')">×</button>
+      </div>
+
+      @if (!game.collapsed) {
+        @for (group of game.groups; track group.id) {
+          @let p = groupProgress(group);
+          <div class="group">
+            <div class="row group-row" (click)="collapse(group.id)">
+              <span class="caret" [class.closed]="group.collapsed">▾</span>
+              <ng-container *ngTemplateOutlet="nameTpl; context: { id: group.id, name: group.name, isTask: false }" />
+              <span class="spacer"></span>
+              <span class="bar" [style.--pct]="p.total ? p.done / p.total : 0"></span>
+              <span class="count" [class.complete]="p.total && p.done === p.total">{{ p.done }}/{{ p.total }}</span>
+              <button class="hover-btn" title="Reset this group now" (click)="$event.stopPropagation(); resetGroup(group.id)">↺</button>
+              <button class="hover-btn danger" title="Delete group" (click)="$event.stopPropagation(); deleteNode(group.id, group.name, 'group')">×</button>
+            </div>
+
+            @if (!group.collapsed) {
+              <ul class="tasks">
+                @for (t of group.tasks; track t.id) {
+                  <li class="row task" [class.done]="t.kind === 'check' ? t.checked : t.kind === 'counter' ? t.value === t.target : t.value === 0">
+                    @switch (t.kind) {
+                      @case ('check') {
+                        <input type="checkbox" [checked]="t.checked" (change)="toggle(t)" />
+                        <ng-container *ngTemplateOutlet="nameTpl; context: { id: t.id, name: t.name, isTask: true }" />
+                        <span class="spacer"></span>
+                      }
+                      @default {
+                        <ng-container *ngTemplateOutlet="nameTpl; context: { id: t.id, name: t.name, isTask: true }" />
+                        <span class="spacer"></span>
+                        @let tp = taskProgress(t);
+                        <button class="step" title="Undo one" (click)="t.kind === 'remaining' ? adjust(t, 1) : adjust(t, -1)">−</button>
+                        <span class="value">
+                          {{ tp.done }}/<input
+                            class="target"
+                            type="number"
+                            min="1"
+                            max="999"
+                            title="Click to change the maximum"
+                            (keydown.enter)="$any($event.target).blur()"
+                            [value]="t.target"
+                            (change)="setTarget(t, $any($event.target).value)"
+                          />
+                          @if (t.kind === 'remaining') { <small>({{ t.value }} left)</small> }
+                        </span>
+                        <button class="step" [title]="t.kind === 'remaining' ? 'Use an entry' : 'Add a completion'" (click)="t.kind === 'remaining' ? adjust(t, -1) : adjust(t, 1)">+</button>
+                      }
+                    }
+                    <button class="hover-btn danger" title="Delete task" (click)="deleteTask(t)">×</button>
+                  </li>
+                }
+                <li class="add-row">
+                  <span>+ add</span>
+                  <button (click)="addTask(group.id, 'check')">checkbox</button>
+                  <button (click)="addTask(group.id, 'counter')">counter</button>
+                  <button (click)="addTask(group.id, 'remaining')">entries</button>
+                </li>
+              </ul>
+            }
+          </div>
+        }
+        <button class="add-link" (click)="addGroup(game.id)">+ group</button>
+      }
+    </section>
+  }
+  <button class="add-link game-add" (click)="addGame()">+ game</button>
+}
