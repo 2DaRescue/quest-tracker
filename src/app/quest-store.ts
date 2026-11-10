@@ -11,6 +11,9 @@ export class QuestStore {
   /** Current time for countdowns; minute precision is plenty. */
   readonly now = signal(Date.now());
 
+  /** Show add/delete/drag/rename controls. Per window; the editor is always in edit mode. */
+  readonly editMode = signal(location.hash === '#editor');
+
   constructor() {
     setInterval(() => this.now.set(Date.now()), 20_000);
     if (!this.api) return;

@@ -502,3 +502,24 @@ qt-timers {
     }
   }
 }
+
+// ---- view mode (edit mode off): just the checklist ----
+
+body.viewing {
+  .grip,
+  .hover-btn,
+  .add-link,
+  .add-links,
+  .add-row,
+  .copy-row,
+  .timer-edit,
+  .cadence.none {
+    display: none;
+  }
+  // Still shown, but not changeable outside edit mode.
+  .cadence,
+  .timer-when,
+  input.target {
+    pointer-events: none;
+  }
+}

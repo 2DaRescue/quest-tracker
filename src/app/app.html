@@ -6,6 +6,7 @@
     <button title="Hide completed tasks" [class.on]="settings()?.hideCompleted" (click)="update({ hideCompleted: !settings()?.hideCompleted })">
       {{ settings()?.hideCompleted ? '◌' : '●' }}
     </button>
+    <button [class.active]="store.editMode()" [title]="store.editMode() ? 'Done editing' : 'Edit: add, delete, rename and reorder'" (click)="toggleEditMode()">✎</button>
     <button title="Open editor" (click)="openEditor()">⚙</button>
     @if (mode === 'widget') {
       <button title="Change opacity" (click)="cycleOpacity()">◐</button>
