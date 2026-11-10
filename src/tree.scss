@@ -503,9 +503,27 @@ qt-timers {
   }
 }
 
-// ---- view mode (edit mode off): just the checklist ----
+// ---- per-game edit toggle ----
 
-body.viewing {
+.edit-btn {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 4px;
+  border-radius: 4px;
+  &:hover {
+    color: var(--text);
+    background: var(--hover);
+  }
+  &.on {
+    color: var(--on-accent);
+    background: var(--accent);
+    font-weight: 600;
+  }
+}
+
+// ---- view mode (game not being edited): just the checklist ----
+
+.game.viewing {
   .grip,
   .hover-btn,
   .add-link,

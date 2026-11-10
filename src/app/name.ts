@@ -17,7 +17,7 @@ import { Board } from './board';
         (blur)="board.commit(id(), isTask(), $any($event.target).value)"
       />
     } @else {
-      <span class="name" [title]="board.store.editMode() ? 'Double-click to rename' : ''" (dblclick)="startRename($event)">{{ name() }}</span>
+      <span class="name" (dblclick)="startRename($event)">{{ name() }}</span>
     }
   `,
 })
@@ -28,7 +28,8 @@ export class Name {
   readonly isTask = input(false);
 
   protected startRename(e: Event) {
-    if (!this.board.store.editMode()) return; // let the click toggle/collapse the row instead
+    // Outside edit mode a double-click just toggles/collapses the row as usual.
+    if ((e.target as Element).closest('.game.viewing')) return;
     e.stopPropagation();
     this.board.edit(this.id());
   }

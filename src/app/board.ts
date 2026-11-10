@@ -127,7 +127,9 @@ export class Board {
   }
 
   protected async addGame() {
-    this.edit(await this.store.dispatch({ type: 'game.add' }));
+    const id = await this.store.dispatch({ type: 'game.add' });
+    if (id) this.store.setEditing(id, true); // a new game starts out being set up
+    this.edit(id);
   }
 
   // ---- inline rename ----

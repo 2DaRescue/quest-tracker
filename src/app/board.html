@@ -2,11 +2,22 @@
   <div class="drop-list" cdkDropList id="games" [cdkDropListData]="null" (cdkDropListDropped)="drop($event, 'game', s.games, s.games)">
     @for (game of s.games; track game.id) {
       @let gp = gameProgress(game);
-      <section class="game" cdkDrag cdkDragLockAxis="y" [cdkDragData]="game.id">
+      <section class="game" [class.viewing]="!store.isEditing(game.id)" cdkDrag cdkDragLockAxis="y" [cdkDragData]="game.id">
         <div class="row game-row" (click)="collapse(game.id)">
           <span class="grip" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
           <span class="caret" [class.closed]="game.collapsed">▾</span>
           <qt-name [id]="game.id" [name]="game.name" />
+          @if (!store.alwaysEdit) {
+            @let editing = store.isEditing(game.id);
+            <button
+              class="edit-btn"
+              [class.on]="editing"
+              [title]="editing ? 'Done editing' : 'Edit this game: add, delete, rename and reorder'"
+              (click)="$event.stopPropagation(); store.setEditing(game.id, !editing)"
+            >
+              {{ editing ? 'done' : '✎' }}
+            </button>
+          }
           <span class="spacer"></span>
           <span class="count" [class.complete]="gp.total && gp.done === gp.total">{{ gp.done }}/{{ gp.total }}</span>
           <button class="hover-btn danger" title="Delete game" (click)="$event.stopPropagation(); deleteNode(game.id, game.name, 'game')">×</button>
@@ -94,5 +105,7 @@
       </section>
     }
   </div>
-  <button class="add-link game-add" (click)="addGame()">+ game</button>
+  @if (store.anyEditing() || !s.games.length) {
+    <button class="add-link game-add" (click)="addGame()">+ game</button>
+  }
 }

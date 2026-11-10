@@ -62,7 +62,7 @@ export class Timers {
   protected readonly soonMs = SOON_MS;
 
   protected toggleEdit(id: string) {
-    if (!this.board.store.editMode()) return;
+    if (!this.board.store.isEditing(this.game().id)) return;
     this.editingId.set(this.editingId() === id ? null : id);
   }
 

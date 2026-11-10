@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Board } from './board';
 import { ConfirmDialog } from './confirm';
 import { QuestStore } from './quest-store';
@@ -36,7 +36,6 @@ export class App {
   constructor() {
     document.body.classList.add(`mode-${this.mode}`);
     this.store.api?.onPinned((p) => this.pinned.set(p));
-    effect(() => document.body.classList.toggle('viewing', !this.store.editMode()));
   }
 
   protected readonly scales = [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
@@ -58,10 +57,6 @@ export class App {
 
   protected update(patch: Partial<Settings>) {
     this.store.dispatch({ type: 'settings.update', patch });
-  }
-
-  protected toggleEditMode() {
-    this.store.editMode.update((on) => !on);
   }
 
   protected togglePin() {

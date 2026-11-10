@@ -11,8 +11,27 @@ export class QuestStore {
   /** Current time for countdowns; minute precision is plenty. */
   readonly now = signal(Date.now());
 
-  /** Show add/delete/drag/rename controls. Per window; the editor is always in edit mode. */
-  readonly editMode = signal(location.hash === '#editor');
+  /** The editor window always shows editing controls; elsewhere they're switched on per game. */
+  readonly alwaysEdit = location.hash === '#editor';
+  private readonly editingGames = signal<ReadonlySet<string>>(new Set());
+
+  isEditing(gameId: string): boolean {
+    return this.alwaysEdit || this.editingGames().has(gameId);
+  }
+
+  /** True when any game shows its editing controls (e.g. to offer "+ game"). */
+  anyEditing(): boolean {
+    return this.alwaysEdit || this.editingGames().size > 0;
+  }
+
+  setEditing(gameId: string, on: boolean) {
+    this.editingGames.update((s) => {
+      const next = new Set(s);
+      if (on) next.add(gameId);
+      else next.delete(gameId);
+      return next;
+    });
+  }
 
   constructor() {
     setInterval(() => this.now.set(Date.now()), 20_000);
