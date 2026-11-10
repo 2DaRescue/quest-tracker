@@ -1,6 +1,11 @@
 qt-board {
   display: block;
   padding: 4px 8px 12px;
+  user-select: none; // clicks and drags shouldn't select text; rename boxes still can
+}
+
+input.rename {
+  user-select: text;
 }
 
 .row {
