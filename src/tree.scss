@@ -194,8 +194,20 @@ input.target {
   }
 }
 
+// While renaming, give the text box the whole row: drop the spacer, bar and
+// (invisible but space-taking) hover buttons.
+.row:has(input.rename) {
+  .spacer,
+  .bar,
+  .hover-btn,
+  .cadence {
+    display: none;
+  }
+}
+
 input.rename {
-  flex: 1;
+  flex: 1 1 auto;
+  width: 0; // grow from nothing rather than the default 20-character width
   min-width: 0;
   font: inherit;
   color: var(--text);
