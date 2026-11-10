@@ -50,7 +50,7 @@ function seed() {
         characters: [],
       },
     ],
-    settings: { opacity: 1, widgetBounds: null },
+    settings: { opacity: 1, widgetBounds: null, hideCompleted: false, launchAtStartup: false },
   };
 }
 
@@ -142,6 +142,36 @@ function findOwner(s, ownerId) {
 
 function findNode(s, nodeId) {
   return findOwner(s, nodeId) ?? findGroup(s, nodeId)?.group ?? null;
+}
+
+/** The list an item currently lives in, and its position there. */
+function locate(s, kind, itemId) {
+  if (kind === 'game') {
+    const index = s.games.findIndex((g) => g.id === itemId);
+    return index >= 0 ? { list: s.games, index } : null;
+  }
+  if (kind === 'character') {
+    const f = findCharacter(s, itemId);
+    return f && { list: f.game.characters, index: f.index };
+  }
+  if (kind === 'group') {
+    const f = findGroup(s, itemId);
+    return f && { list: f.owner.groups, index: f.index };
+  }
+  if (kind === 'task') {
+    const f = findTask(s, itemId);
+    return f && { list: f.group.tasks, index: f.index };
+  }
+  return null;
+}
+
+/** The list under `parentId` that holds items of `kind`. */
+function childList(s, kind, parentId) {
+  if (kind === 'game') return s.games;
+  if (kind === 'character') return s.games.find((g) => g.id === parentId)?.characters ?? null;
+  if (kind === 'group') return findOwner(s, parentId)?.groups ?? null;
+  if (kind === 'task') return findGroup(s, parentId)?.group.tasks ?? null;
+  return null;
 }
 
 /** Deep copy with fresh ids and progress reset, e.g. for another character. */
@@ -288,8 +318,20 @@ function reduce(s, a) {
       if (n) n.collapsed = !n.collapsed;
       break;
     }
+    case 'node.move': {
+      // Drag-and-drop: take the item out of its list, insert into the target
+      // parent's list at `index` (index counted with the item already removed).
+      const src = locate(s, a.kind, a.id);
+      const dest = childList(s, a.kind, a.toParentId);
+      if (!src || !dest) break;
+      const [item] = src.list.splice(src.index, 1);
+      dest.splice(clamp(a.index, 0, dest.length), 0, item);
+      break;
+    }
     case 'settings.update': {
       const p = a.patch ?? {};
+      if (typeof p.hideCompleted === 'boolean') s.settings.hideCompleted = p.hideCompleted;
+      if (typeof p.launchAtStartup === 'boolean') s.settings.launchAtStartup = p.launchAtStartup;
       if (typeof p.opacity === 'number') s.settings.opacity = clamp(p.opacity, MIN_OPACITY, 1);
       if (p.widgetBounds) s.settings.widgetBounds = p.widgetBounds;
       break;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell } = require('electron');
 const path = require('node:path');
 const store = require('./store.cjs');
 
@@ -15,6 +15,7 @@ const POLL_MS = 80;
 let tray = null;
 let widget = null;
 let popup = null;
+let editor = null;
 let quitting = false;
 
 const pop = { pinned: false, editing: false, openTimer: null, poll: null, outsideSince: null };
@@ -121,6 +122,41 @@ function createWidget() {
 
 function showWidget() {
   widget.showInactive();
+}
+
+// ---- full editor -----------------------------------------------------------
+
+// A normal window (title bar, taskbar button) for bigger edits and settings.
+// Created on demand and destroyed on close; nothing is lost since state lives here.
+function openEditor() {
+  if (editor && !editor.isDestroyed()) {
+    if (editor.isMinimized()) editor.restore();
+    return editor.focus();
+  }
+  editor = new BrowserWindow({
+    width: 760,
+    height: 640,
+    minWidth: 520,
+    minHeight: 360,
+    title: 'Quest Tracker — Editor',
+    icon: makeIcon(),
+    autoHideMenuBar: true,
+    backgroundColor: BG,
+    show: false,
+    webPreferences: { preload: PRELOAD },
+  });
+  editor.setMenu(null);
+  editor.on('page-title-updated', (e) => e.preventDefault()); // keep "— Editor" in the title
+  editor.once('ready-to-show', () => editor.show());
+  editor.on('closed', () => (editor = null));
+  load(editor, 'editor');
+}
+
+// Launch with Windows. In development there's no installed exe yet, so point
+// Windows at electron.exe plus this project folder.
+function applyLaunchAtStartup(enabled) {
+  const args = app.isPackaged ? [] : [app.getAppPath()];
+  app.setLoginItemSettings({ openAtLogin: enabled, path: process.execPath, args });
 }
 
 // ---- tray popup ------------------------------------------------------------
@@ -236,6 +272,7 @@ function createTray() {
   });
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      { label: 'Open editor…', click: openEditor },
       { label: 'Show desktop widget', click: showWidget },
       { label: 'Open popup (pinned)', click: () => (showPopup({ focus: true }), setPinned(true)) },
       { type: 'separator' },
@@ -254,6 +291,11 @@ function registerIpc() {
     if (pinned) popup.focus();
   });
   ipcMain.on('popup:editing', (_e, editing) => (pop.editing = !!editing));
+  ipcMain.on('editor:open', () => {
+    if (popup.isVisible()) hidePopup();
+    openEditor();
+  });
+  ipcMain.on('data:openFolder', () => shell.openPath(app.getPath('userData')));
   ipcMain.on('window:hide', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     if (win === popup) hidePopup();
@@ -262,7 +304,9 @@ function registerIpc() {
 
   store.subscribe((state, action) => {
     broadcast('state:changed', state);
-    if (action.type === 'settings.update' && widget && !widget.isDestroyed()) widget.setOpacity(state.settings.opacity);
+    if (action.type !== 'settings.update') return;
+    if (widget && !widget.isDestroyed()) widget.setOpacity(state.settings.opacity);
+    if (typeof action.patch?.launchAtStartup === 'boolean') applyLaunchAtStartup(state.settings.launchAtStartup);
   });
 }
 
@@ -271,7 +315,8 @@ function registerIpc() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', showWidget);
+  // Launching again (e.g. from a shortcut) shows the app; `--editor` opens the editor.
+  app.on('second-instance', (_e, argv) => (argv.includes('--editor') ? openEditor() : showWidget()));
   app.whenReady().then(() => {
     app.setAppUserModelId('com.sidequest.questtracker');
     store.init();
@@ -279,6 +324,7 @@ if (!app.requestSingleInstanceLock()) {
     createWidget();
     createPopup();
     createTray();
+    if (process.argv.includes('--editor')) openEditor();
   });
   app.on('before-quit', () => {
     quitting = true;

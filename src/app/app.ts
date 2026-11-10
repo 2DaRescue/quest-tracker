@@ -1,10 +1,16 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Board } from './board';
 import { QuestStore } from './quest-store';
+import { Settings } from './model';
 
-type Mode = 'widget' | 'popup';
+type Mode = 'widget' | 'popup' | 'editor';
 
 const OPACITY_STEPS = [1, 0.85, 0.7, 0.55];
+
+function readMode(): Mode {
+  const hash = location.hash.replace('#', '');
+  return hash === 'popup' || hash === 'editor' ? hash : 'widget';
+}
 
 @Component({
   selector: 'app-root',
@@ -15,12 +21,17 @@ const OPACITY_STEPS = [1, 0.85, 0.7, 0.55];
 })
 export class App {
   protected readonly store = inject(QuestStore);
-  protected readonly mode: Mode = location.hash.replace('#', '') === 'popup' ? 'popup' : 'widget';
+  protected readonly mode = readMode();
   protected readonly pinned = signal(false);
+  protected readonly settings = computed(() => this.store.state()?.settings);
 
   constructor() {
     document.body.classList.add(`mode-${this.mode}`);
     this.store.api?.onPinned((p) => this.pinned.set(p));
+  }
+
+  protected update(patch: Partial<Settings>) {
+    this.store.dispatch({ type: 'settings.update', patch });
   }
 
   protected togglePin() {
@@ -31,11 +42,18 @@ export class App {
     this.store.api?.hideWindow();
   }
 
+  protected openEditor() {
+    this.store.api?.openEditor();
+  }
+
+  protected openDataFolder() {
+    this.store.api?.openDataFolder();
+  }
+
   protected cycleOpacity() {
-    const current = this.store.state()?.settings.opacity ?? 1;
+    const current = this.settings()?.opacity ?? 1;
     const i = OPACITY_STEPS.findIndex((o) => Math.abs(o - current) < 0.01);
-    const opacity = OPACITY_STEPS[(i + 1) % OPACITY_STEPS.length];
-    this.store.dispatch({ type: 'settings.update', patch: { opacity } });
+    this.update({ opacity: OPACITY_STEPS[(i + 1) % OPACITY_STEPS.length] });
   }
 
   protected onEscape() {

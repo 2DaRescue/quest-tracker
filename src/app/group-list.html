@@ -1,0 +1,91 @@
+<div
+  class="drop-list"
+  cdkDropList
+  [id]="'groups-' + owner().id"
+  [cdkDropListData]="owner().id"
+  [cdkDropListConnectedTo]="board.groupListIds()"
+  (cdkDropListDropped)="board.drop($event, 'group', owner().groups, owner().groups)"
+>
+  @for (group of owner().groups; track group.id) {
+    @let p = groupProgress(group);
+    @let shown = board.visibleTasks(group);
+    <div class="group" cdkDrag cdkDragLockAxis="y" [cdkDragData]="group.id">
+      <div class="row group-row" (click)="collapse(group.id)">
+        <span class="grip" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
+        <span class="caret" [class.closed]="group.collapsed">▾</span>
+        <qt-name [id]="group.id" [name]="group.name" />
+        <span class="spacer"></span>
+        <span class="bar" [style.--pct]="p.total ? p.done / p.total : 0"></span>
+        <span class="count" [class.complete]="p.total && p.done === p.total">{{ p.done }}/{{ p.total }}</span>
+        <button class="hover-btn" title="Reset this group now" (click)="$event.stopPropagation(); resetGroup(group.id)">↺</button>
+        <button class="hover-btn" title="Copy this group" (click)="$event.stopPropagation(); copyGroup(group.id)">⧉</button>
+        <button class="hover-btn danger" title="Delete group" (click)="$event.stopPropagation(); board.deleteNode(group.id, group.name, 'group')">×</button>
+      </div>
+
+      @if (copyingId() === group.id) {
+        <div class="copy-row">
+          <span>Copy to:</span>
+          <button (click)="duplicateGroup(group.id, game().id)">{{ game().name }} (shared)</button>
+          @for (ch of game().characters; track ch.id) {
+            <button (click)="duplicateGroup(group.id, ch.id)">{{ ch.name }}</button>
+          }
+          <button class="cancel" (click)="copyingId.set(null)">cancel</button>
+        </div>
+      }
+
+      @if (!group.collapsed) {
+        <ul
+          class="tasks"
+          cdkDropList
+          [id]="'tasks-' + group.id"
+          [cdkDropListData]="group.id"
+          [cdkDropListConnectedTo]="board.taskListIds()"
+          (cdkDropListDropped)="board.drop($event, 'task', group.tasks, shown)"
+        >
+          @for (t of shown; track t.id) {
+            <li class="row task" [class.done]="isDone(t)" cdkDrag cdkDragLockAxis="y" [cdkDragData]="t.id">
+              <span class="grip" cdkDragHandle title="Drag to reorder">⠿</span>
+              @switch (t.kind) {
+                @case ('check') {
+                  <input type="checkbox" [checked]="t.checked" (change)="toggle(t)" />
+                  <qt-name [id]="t.id" [name]="t.name" [isTask]="true" />
+                  <span class="spacer"></span>
+                }
+                @default {
+                  @let tp = taskProgress(t);
+                  <qt-name [id]="t.id" [name]="t.name" [isTask]="true" />
+                  <span class="spacer"></span>
+                  <button class="step" title="Undo one" (click)="t.kind === 'remaining' ? adjust(t, 1) : adjust(t, -1)">−</button>
+                  <span class="value">
+                    {{ tp.done }}/<input
+                      class="target"
+                      type="number"
+                      min="1"
+                      max="999"
+                      title="Click to change the maximum"
+                      (keydown.enter)="$any($event.target).blur()"
+                      [value]="t.target"
+                      (change)="setTarget(t, $any($event.target).value)"
+                    />
+                    @if (t.kind === 'remaining') { <small>({{ t.value }} left)</small> }
+                  </span>
+                  <button class="step" [title]="t.kind === 'remaining' ? 'Use an entry' : 'Add a completion'" (click)="t.kind === 'remaining' ? adjust(t, -1) : adjust(t, 1)">+</button>
+                }
+              }
+              <button class="hover-btn danger" title="Delete task" (click)="deleteTask(t)">×</button>
+            </li>
+          }
+          @if (shown.length < group.tasks.length) {
+            <li class="hidden-note">{{ group.tasks.length - shown.length }} completed hidden</li>
+          }
+        </ul>
+        <div class="add-row">
+          <span>+ add</span>
+          <button (click)="addTask(group.id, 'check')">checkbox</button>
+          <button (click)="addTask(group.id, 'counter')">counter</button>
+          <button (click)="addTask(group.id, 'remaining')">entries</button>
+        </div>
+      }
+    </div>
+  }
+</div>

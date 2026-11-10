@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { Game, Group, gameProgress, groupProgress, taskProgress } from './model';
+import { Game, Group, dropIndex, gameProgress, groupProgress, taskProgress } from './model';
+
+describe('dropIndex', () => {
+  const items = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));
+
+  it('matches the visible index when nothing is hidden', () => {
+    // move "a" to the end
+    expect(dropIndex(items, items, 'a', 4)).toBe(4);
+    // move "d" to the top
+    expect(dropIndex(items, items, 'd', 0)).toBe(0);
+  });
+
+  it('skips over hidden (completed) items', () => {
+    const visible = items.filter((x) => x.id !== 'b' && x.id !== 'c'); // a, d, e
+    // drag "e" to visible position 1 (just before "d") → full list without e: a b c d → index 3
+    expect(dropIndex(items, visible, 'e', 1)).toBe(3);
+    // drop into an empty spot at the end of another list
+    expect(dropIndex(items, visible, 'zz', 3)).toBe(5);
+  });
+});
 
 describe('progress', () => {
   it('counts checkboxes, completed counters and remaining entries', () => {

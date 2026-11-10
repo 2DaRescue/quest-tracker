@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld('questApi', {
   setPinned: (pinned) => ipcRenderer.send('popup:pin', pinned),
   setEditing: (editing) => ipcRenderer.send('popup:editing', editing),
   hideWindow: () => ipcRenderer.send('window:hide'),
+  openEditor: () => ipcRenderer.send('editor:open'),
+  openDataFolder: () => ipcRenderer.send('data:openFolder'),
 });

@@ -1,67 +1,60 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { Component, Injector, afterNextRender, inject, signal } from '@angular/core';
+import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
+import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
+import { GroupList } from './group-list';
+import { Name } from './name';
 import { QuestStore } from './quest-store';
-import { Game, Task, TaskKind, characterProgress, gameProgress, groupProgress, taskProgress } from './model';
+import { Group, NodeKind, characterProgress, dropIndex, gameProgress, isDone } from './model';
 
+/** The whole tree: games → (shared groups, characters → groups) → tasks. */
 @Component({
   selector: 'qt-board',
-  imports: [NgTemplateOutlet],
+  imports: [CdkDropList, CdkDrag, CdkDragHandle, GroupList, Name],
   templateUrl: './board.html',
-  styleUrl: './board.scss',
   host: {
     '(focusin)': 'onFocus($event, true)',
     '(focusout)': 'onFocus($event, false)',
   },
 })
 export class Board {
-  protected readonly store = inject(QuestStore);
+  readonly store = inject(QuestStore);
   private readonly injector = inject(Injector);
 
-  /** id of the task/group/game whose name is being edited */
-  protected readonly editingId = signal<string | null>(null);
+  /** id of the game/character/group/task whose name is being edited */
+  readonly editingId = signal<string | null>(null);
 
   protected readonly gameProgress = gameProgress;
-  protected readonly groupProgress = groupProgress;
-  protected readonly taskProgress = taskProgress;
   protected readonly characterProgress = characterProgress;
 
-  /** group whose "Copy to:" picker is open */
-  protected readonly copyingId = signal<string | null>(null);
+  private readonly games = computed(() => this.store.state()?.games ?? []);
+  private readonly owners = computed(() => this.games().flatMap((g) => [g, ...g.characters]));
 
-  protected toggle(t: Task) {
-    this.store.dispatch({ type: 'task.toggle', taskId: t.id });
+  /** Every group list is connected so groups can move between characters. */
+  readonly groupListIds = computed(() => this.owners().map((o) => `groups-${o.id}`));
+  readonly taskListIds = computed(() => this.owners().flatMap((o) => o.groups.map((g) => `tasks-${g.id}`)));
+
+  visibleTasks(group: Group) {
+    return this.store.state()?.settings.hideCompleted ? group.tasks.filter((t) => !isDone(t)) : group.tasks;
   }
 
-  protected adjust(t: Task, delta: 1 | -1) {
-    this.store.dispatch({ type: 'task.adjust', taskId: t.id, delta });
-  }
-
-  protected setTarget(t: Task, raw: string) {
-    const target = parseInt(raw, 10);
-    if (target > 0) this.store.dispatch({ type: 'task.setTarget', taskId: t.id, target });
+  // `any`: each drop list carries a different data type (string id, or null for the root games list).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  drop<T extends { id: string }>(e: CdkDragDrop<any>, kind: NodeKind, full: T[], visible: T[]) {
+    const id = e.item.data as string;
+    const sameList = e.previousContainer === e.container;
+    if (sameList && e.previousIndex === e.currentIndex) return;
+    const index = dropIndex(full, visible, id, e.currentIndex);
+    this.store.dispatch({ type: 'node.move', kind, id, toParentId: e.container.data, index });
   }
 
   protected collapse(id: string) {
     this.store.dispatch({ type: 'node.toggleCollapse', id });
   }
 
-  protected resetGroup(groupId: string) {
-    this.store.dispatch({ type: 'group.resetNow', groupId });
-  }
-
-  protected deleteTask(t: Task) {
-    this.store.dispatch({ type: 'task.delete', taskId: t.id });
-  }
-
-  protected deleteNode(id: string, name: string, what: string) {
+  deleteNode(id: string, name: string, what: string) {
     if (confirm(`Delete ${what} "${name}" and everything in it?`)) this.store.dispatch({ type: 'node.delete', id });
   }
 
-  protected async addTask(groupId: string, kind: TaskKind) {
-    this.edit(await this.store.dispatch({ type: 'task.add', groupId, kind }));
-  }
-
-  protected async addGroup(parentId: string) {
+  async addGroup(parentId: string) {
     this.edit(await this.store.dispatch({ type: 'group.add', parentId }));
   }
 
@@ -73,24 +66,13 @@ export class Board {
     this.edit(await this.store.dispatch({ type: 'character.duplicate', characterId }));
   }
 
-  /** With no characters there's only one place to copy to, so skip the picker. */
-  protected copyGroup(groupId: string, game: Game) {
-    if (game.characters.length) this.copyingId.set(this.copyingId() === groupId ? null : groupId);
-    else this.duplicateGroup(groupId, game.id);
-  }
-
-  protected async duplicateGroup(groupId: string, targetId: string) {
-    this.copyingId.set(null);
-    this.edit(await this.store.dispatch({ type: 'group.duplicate', groupId, targetId }));
-  }
-
   protected async addGame() {
     this.edit(await this.store.dispatch({ type: 'game.add' }));
   }
 
   // ---- inline rename ----
 
-  protected edit(id: string | null) {
+  edit(id: string | null) {
     this.editingId.set(id);
     if (id)
       afterNextRender(() => document.querySelector<HTMLInputElement>('input.rename')?.select(), {
@@ -98,14 +80,14 @@ export class Board {
       });
   }
 
-  protected commit(id: string, isTask: boolean, value: string) {
+  commit(id: string, isTask: boolean, value: string) {
     if (this.editingId() !== id) return; // already committed/cancelled
     this.editingId.set(null);
     if (isTask) this.store.dispatch({ type: 'task.rename', taskId: id, name: value });
     else this.store.dispatch({ type: 'node.rename', id, name: value });
   }
 
-  protected cancel(e: Event) {
+  cancel(e: Event) {
     e.stopPropagation(); // don't let Esc also close the popup
     this.editingId.set(null);
   }

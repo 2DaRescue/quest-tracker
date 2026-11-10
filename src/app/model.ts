@@ -34,7 +34,11 @@ export interface Game {
 export interface Settings {
   opacity: number;
   widgetBounds: { x: number; y: number; width: number; height: number } | null;
+  hideCompleted?: boolean;
+  launchAtStartup?: boolean;
 }
+
+export type NodeKind = 'game' | 'character' | 'group' | 'task';
 
 export interface AppState {
   version: number;
@@ -58,6 +62,7 @@ export type Action =
   | { type: 'node.rename'; id: string; name: string }
   | { type: 'node.delete'; id: string }
   | { type: 'node.toggleCollapse'; id: string }
+  | { type: 'node.move'; kind: NodeKind; id: string; toParentId: string | null; index: number }
   | { type: 'settings.update'; patch: Partial<Settings> };
 
 export interface DispatchResult {
@@ -73,6 +78,8 @@ export interface QuestApi {
   setPinned(pinned: boolean): void;
   setEditing(editing: boolean): void;
   hideWindow(): void;
+  openEditor(): void;
+  openDataFolder(): void;
 }
 
 declare global {
@@ -96,6 +103,22 @@ export function taskProgress(t: Task): Progress {
     case 'remaining':
       return { done: (t.target ?? 0) - (t.value ?? 0), total: t.target ?? 0 };
   }
+}
+
+export function isDone(t: Task): boolean {
+  const p = taskProgress(t);
+  return p.total > 0 && p.done >= p.total;
+}
+
+/**
+ * Convert a drop position in the *visible* list (some items may be hidden)
+ * into an index in the full list with the dragged item removed — the form
+ * the store's `node.move` expects.
+ */
+export function dropIndex<T extends { id: string }>(full: T[], visible: T[], movingId: string, visibleIndex: number): number {
+  const fullOthers = full.filter((x) => x.id !== movingId);
+  const anchor = visible.filter((x) => x.id !== movingId)[visibleIndex];
+  return anchor ? fullOthers.indexOf(anchor) : fullOthers.length;
 }
 
 export function sumProgress(items: Progress[]): Progress {

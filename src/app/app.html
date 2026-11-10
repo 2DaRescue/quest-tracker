@@ -1,21 +1,57 @@
-<header class="titlebar" [class.drag]="mode === 'widget'">
-  <span class="logo">✓</span>
-  <span class="title">Quest Tracker</span>
-  <span class="spacer"></span>
-  @if (mode === 'widget') {
-    <button title="Change opacity" (click)="cycleOpacity()">◐</button>
-    <button title="Hide widget (reopen from the tray icon's menu)" (click)="hide()">×</button>
-  } @else {
-    <button [class.active]="pinned()" [title]="pinned() ? 'Unpin (closes when mouse leaves)' : 'Pin open'" (click)="togglePin()">
-      📌
+@if (mode !== 'editor') {
+  <header class="titlebar" [class.drag]="mode === 'widget'">
+    <span class="logo">✓</span>
+    <span class="title">Quest Tracker</span>
+    <span class="spacer"></span>
+    <button title="Hide completed tasks" [class.on]="settings()?.hideCompleted" (click)="update({ hideCompleted: !settings()?.hideCompleted })">
+      {{ settings()?.hideCompleted ? '◌' : '●' }}
     </button>
-  }
-</header>
+    <button title="Open editor" (click)="openEditor()">⚙</button>
+    @if (mode === 'widget') {
+      <button title="Change opacity" (click)="cycleOpacity()">◐</button>
+      <button title="Hide widget (reopen from the tray icon's menu)" (click)="hide()">×</button>
+    } @else {
+      <button [class.active]="pinned()" [title]="pinned() ? 'Unpin (closes when mouse leaves)' : 'Pin open'" (click)="togglePin()">
+        📌
+      </button>
+    }
+  </header>
+}
 
-<main>
-  @if (!store.available) {
-    <p class="notice">This UI runs inside the desktop app. Start it with <code>npm run dev</code>.</p>
-  } @else {
-    <qt-board />
-  }
-</main>
+@if (!store.available) {
+  <main><p class="notice">This UI runs inside the desktop app. Start it with <code>npm run dev</code>.</p></main>
+} @else if (mode === 'editor') {
+  <div class="editor">
+    <main>
+      <h1>Games &amp; tasks</h1>
+      <p class="hint">Double-click any name to rename · drag ⠿ to reorder or move between groups and characters.</p>
+      <qt-board />
+    </main>
+
+    @if (settings(); as s) {
+      <aside class="settings">
+        <h2>Display</h2>
+        <label class="field">
+          <span>Widget opacity <b>{{ (s.opacity * 100).toFixed(0) }}%</b></span>
+          <input type="range" min="0.4" max="1" step="0.05" [value]="s.opacity" (input)="update({ opacity: +$any($event.target).value })" />
+        </label>
+        <label class="check">
+          <input type="checkbox" [checked]="s.hideCompleted" (change)="update({ hideCompleted: $any($event.target).checked })" />
+          Hide completed tasks
+        </label>
+
+        <h2>System</h2>
+        <label class="check">
+          <input type="checkbox" [checked]="s.launchAtStartup" (change)="update({ launchAtStartup: $any($event.target).checked })" />
+          Launch when Windows starts
+        </label>
+
+        <h2>Data</h2>
+        <p class="hint">Progress saves automatically. Copy the data folder to back it up.</p>
+        <button class="btn" (click)="openDataFolder()">Open data folder</button>
+      </aside>
+    }
+  </div>
+} @else {
+  <main><qt-board /></main>
+}
