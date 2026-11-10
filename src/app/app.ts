@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Board } from './board';
+import { ConfirmDialog } from './confirm';
 import { QuestStore } from './quest-store';
 import { ResetConfig, Settings } from './model';
 
@@ -21,7 +22,7 @@ function readMode(): Mode {
 
 @Component({
   selector: 'app-root',
-  imports: [Board],
+  imports: [Board, ConfirmDialog],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '(document:keydown.escape)': 'onEscape()' },

@@ -544,6 +544,7 @@ function reduce(s, a) {
       const p = a.patch ?? {};
       if (typeof p.hideCompleted === 'boolean') s.settings.hideCompleted = p.hideCompleted;
       if (typeof p.launchAtStartup === 'boolean') s.settings.launchAtStartup = p.launchAtStartup;
+      if (typeof p.confirmDelete === 'boolean') s.settings.confirmDelete = p.confirmDelete;
       if (typeof p.opacity === 'number') s.settings.opacity = clamp(p.opacity, MIN_OPACITY, 1);
       if (p.widgetBounds) s.settings.widgetBounds = p.widgetBounds;
       break;

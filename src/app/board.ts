@@ -1,5 +1,6 @@
 import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
+import { ConfirmService } from './confirm';
 import { GroupList } from './group-list';
 import { Name } from './name';
 import { Timers } from './timers';
@@ -31,6 +32,7 @@ import {
 })
 export class Board {
   readonly store = inject(QuestStore);
+  private readonly confirm = inject(ConfirmService);
   private readonly injector = inject(Injector);
 
   /** id of the game/character/group/task whose name is being edited */
@@ -74,8 +76,14 @@ export class Board {
     this.store.dispatch({ type: 'node.toggleCollapse', id });
   }
 
-  deleteNode(id: string, name: string, what: string) {
-    if (confirm(`Delete ${what} "${name}" and everything in it?`)) this.store.dispatch({ type: 'node.delete', id });
+  async deleteNode(id: string, name: string, what: string) {
+    if (this.store.state()?.settings.confirmDelete !== false) {
+      const contents = what === 'timer' ? '' : ' and everything in it';
+      const r = await this.confirm.ask(`Delete ${what}?`, `"${name}"${contents} will be removed.`);
+      if (!r.ok) return;
+      if (r.dontAsk) this.store.dispatch({ type: 'settings.update', patch: { confirmDelete: false } });
+    }
+    this.store.dispatch({ type: 'node.delete', id });
   }
 
   async addGroup(parentId: string) {

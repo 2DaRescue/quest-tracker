@@ -74,6 +74,12 @@
           </fieldset>
         }
 
+        <h2>Editing</h2>
+        <label class="check">
+          <input type="checkbox" [checked]="s.confirmDelete !== false" (change)="update({ confirmDelete: $any($event.target).checked })" />
+          Ask before deleting
+        </label>
+
         <h2>System</h2>
         <label class="check">
           <input type="checkbox" [checked]="s.launchAtStartup" (change)="update({ launchAtStartup: $any($event.target).checked })" />
@@ -89,3 +95,5 @@
 } @else {
   <main><qt-board /></main>
 }
+
+<qt-confirm-dialog />

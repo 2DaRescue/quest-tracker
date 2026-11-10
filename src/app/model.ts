@@ -62,6 +62,8 @@ export interface Settings {
   widgetBounds: { x: number; y: number; width: number; height: number } | null;
   hideCompleted?: boolean;
   launchAtStartup?: boolean;
+  /** Ask before deleting games/characters/groups/timers. Missing = true. */
+  confirmDelete?: boolean;
 }
 
 export type NodeKind = 'game' | 'character' | 'group' | 'task';
