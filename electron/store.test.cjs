@@ -60,12 +60,47 @@ test('migrates a v1 file, keeps a backup, guesses cadence from group names', () 
     settings: { opacity: 1, widgetBounds: null },
   });
   const s = store.get();
-  assert.equal(s.version, 3);
+  assert.equal(s.version, 4);
   assert.deepEqual(s.games[0].characters, []);
   assert.deepEqual(s.games[0].groups.map((g) => g.cadence), ['daily', 'weekly', 'none']);
   assert.equal(s.games[0].groups[0].tasks[0].checked, true, 'migration never resets progress');
   assert.ok(fs.existsSync(`${dataFile()}.v1.bak`));
-  assert.equal(JSON.parse(fs.readFileSync(dataFile())).version, 3, 'saved right away');
+  assert.equal(JSON.parse(fs.readFileSync(dataFile())).version, 4, 'saved right away');
+});
+
+test('characters can be ticked off directly and reset on their own cadence', () => {
+  const store = loadStore(v3([]));
+  const a = store.dispatch({ type: 'character.add', gameId: 'g1' }).createdId;
+  const b = store.dispatch({ type: 'character.add', gameId: 'g1' }).createdId;
+  store.dispatch({ type: 'character.setCadence', characterId: b, cadence: 'none' });
+  store.dispatch({ type: 'character.toggle', characterId: a });
+  store.dispatch({ type: 'character.toggle', characterId: b });
+  let [ca, cb] = store.get().games[0].characters;
+  assert.equal(ca.done, true);
+  assert.equal(ca.cadence, 'daily', 'new characters reset daily');
+
+  store.tick(Date.now() + DAY);
+  [ca, cb] = store.get().games[0].characters;
+  assert.equal(ca.done, false, 'daily character unticked at reset');
+  assert.equal(cb.done, true, 'manual character stays ticked');
+});
+
+test('a hand-edited file saved with a byte-order mark still loads', () => {
+  fs.writeFileSync(dataFile(), '﻿' + JSON.stringify(v3([], { name: 'Edited in Notepad' })));
+  const store = loadStore();
+  assert.equal(store.get().games[0].name, 'Edited in Notepad');
+  assert.equal(fs.readdirSync(dir).filter((f) => f.includes('corrupt')).length, 0);
+});
+
+test('migrates v3 characters to tickable', () => {
+  const store = loadStore({
+    ...v3([]),
+    games: [{ id: 'g1', name: 'G', collapsed: false, reset: UTC, groups: [], characters: [{ id: 'c', name: 'Main', collapsed: false, groups: [] }] }],
+  });
+  assert.deepEqual(
+    (({ done, cadence }) => ({ done, cadence }))(store.get().games[0].characters[0]),
+    { done: false, cadence: 'daily' },
+  );
 });
 
 test('characters: add, copy group to character, duplicate, delete', () => {

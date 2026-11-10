@@ -35,22 +35,44 @@
               class="drop-list"
               cdkDropList
               [cdkDropListData]="game.id"
-              (cdkDropListDropped)="drop($event, 'character', game.characters, game.characters)"
+              (cdkDropListDropped)="drop($event, 'character', game.characters, visibleCharacters(game))"
             >
-              @for (ch of game.characters; track ch.id) {
+              @for (ch of visibleCharacters(game); track ch.id) {
                 @let cp = characterProgress(ch);
+                @let simple = isSimpleCharacter(ch);
                 <div class="character" cdkDrag cdkDragLockAxis="y" [cdkDragData]="ch.id">
-                  <div class="row character-row" (click)="collapse(ch.id)">
+                  <div
+                    class="row character-row"
+                    [class.simple]="simple"
+                    [class.done]="cp.total > 0 && cp.done === cp.total"
+                    (click)="simple ? toggleCharacter(ch.id) : collapse(ch.id)"
+                  >
                     <span class="grip" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
-                    <span class="caret" [class.closed]="ch.collapsed">▾</span>
+                    @if (simple) {
+                      <input type="checkbox" [checked]="ch.done" (click)="$event.stopPropagation()" (change)="toggleCharacter(ch.id)" />
+                    } @else {
+                      <span class="caret" [class.closed]="ch.collapsed">▾</span>
+                    }
                     <span class="avatar">{{ ch.name.charAt(0) }}</span>
                     <qt-name [id]="ch.id" [name]="ch.name" />
+                    @if (simple) {
+                      <button
+                        [class]="'cadence ' + ch.cadence"
+                        [title]="cadenceTitle[ch.cadence] + ' — click to change'"
+                        (click)="$event.stopPropagation(); cycleCharacterCadence(ch)"
+                      >
+                        {{ cadenceLabel[ch.cadence] }}
+                      </button>
+                    }
                     <span class="spacer"></span>
-                    <span class="count" [class.complete]="cp.total && cp.done === cp.total">{{ cp.done }}/{{ cp.total }}</span>
+                    @if (!simple) {
+                      <span class="count" [class.complete]="cp.total && cp.done === cp.total">{{ cp.done }}/{{ cp.total }}</span>
+                    }
+                    <button class="hover-btn" title="Add a group to track this character's tasks in detail" (click)="$event.stopPropagation(); addGroup(ch.id)">+</button>
                     <button class="hover-btn" title="Duplicate character (same groups, progress reset)" (click)="$event.stopPropagation(); duplicateCharacter(ch.id)">⧉</button>
                     <button class="hover-btn danger" title="Delete character" (click)="$event.stopPropagation(); deleteNode(ch.id, ch.name, 'character')">×</button>
                   </div>
-                  @if (!ch.collapsed) {
+                  @if (!simple && !ch.collapsed) {
                     <div class="children">
                       <qt-group-list [owner]="ch" [game]="game" />
                       <button class="add-link" (click)="addGroup(ch.id)">+ group</button>

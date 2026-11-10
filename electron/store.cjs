@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 
 const { latestBoundary, nextBoundary, isValidTimeZone, defaultResetConfig } = require('./schedule.cjs');
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const MIN_OPACITY = 0.4;
 const RESET_LOG_MAX = 200;
 const CADENCES = ['none', 'daily', 'weekly'];
@@ -72,13 +72,20 @@ function migrate(s) {
     s.resetLog = [];
     s.version = 3;
   }
+  if (s.version === 3) {
+    // Characters can be ticked off directly (for people who don't track details).
+    for (const game of s.games)
+      for (const ch of game.characters) Object.assign(ch, { done: false, cadence: 'daily', periodStart: null });
+    s.version = 4;
+  }
   return s;
 }
 
 function init() {
   file = path.join(app.getPath('userData'), 'quest-tracker.json');
   try {
-    const loaded = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Strip a byte-order mark: Notepad and PowerShell add one when hand-editing the file.
+    const loaded = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
     const oldVersion = loaded?.version;
     if (oldVersion < SCHEMA_VERSION) fs.copyFileSync(file, `${file}.v${oldVersion}.bak`);
     state = migrate(loaded);
@@ -107,22 +114,29 @@ function init() {
  */
 function applyResets(s, now) {
   let changed = false;
-  for (const { game, owner } of groupOwners(s))
-    for (const g of owner.groups) {
-      const boundary = latestBoundary(now, g.cadence, game.reset);
-      if (boundary === null) continue;
-      if (g.periodStart == null) {
-        g.periodStart = boundary; // newly scheduled: start tracking from the current period
-        changed = true;
-      } else if (boundary > g.periodStart) {
-        g.tasks.forEach(resetTask);
-        s.resetLog.push({ groupId: g.id, group: g.name, owner: owner.name, boundary, at: now });
-        g.periodStart = boundary;
-        changed = true;
-      }
+  for (const { game, item, reset } of resettables(s)) {
+    const boundary = latestBoundary(now, item.cadence, game.reset);
+    if (boundary === null) continue;
+    if (item.periodStart == null) {
+      item.periodStart = boundary; // newly scheduled: start tracking from the current period
+      changed = true;
+    } else if (boundary > item.periodStart) {
+      reset();
+      s.resetLog.push({ id: item.id, name: item.name, boundary, at: now });
+      item.periodStart = boundary;
+      changed = true;
     }
+  }
   if (s.resetLog.length > RESET_LOG_MAX) s.resetLog.splice(0, s.resetLog.length - RESET_LOG_MAX);
   return changed;
+}
+
+/** Everything with its own reset cadence: groups (clear their tasks) and characters (untick). */
+function* resettables(s) {
+  for (const { game, owner } of groupOwners(s))
+    for (const g of owner.groups) yield { game, item: g, reset: () => g.tasks.forEach(resetTask) };
+  for (const game of s.games)
+    for (const ch of game.characters) yield { game, item: ch, reset: () => (ch.done = false) };
 }
 
 /** Next daily/weekly reset per game, for countdowns. Derived; never saved. */
@@ -134,9 +148,8 @@ function nextResets(s, now) {
 }
 
 /** Re-anchor groups after a schedule change so editing a time never triggers a surprise reset. */
-function restartPeriods(game, now) {
-  for (const owner of [game, ...game.characters])
-    for (const g of owner.groups) g.periodStart = latestBoundary(now, g.cadence, game.reset);
+function restartPeriods(s, game, now) {
+  for (const r of resettables(s)) if (r.game === game) r.item.periodStart = latestBoundary(now, r.item.cadence, game.reset);
 }
 
 let lastNextKey = '';
@@ -343,7 +356,15 @@ function reduce(s, a) {
     case 'character.add': {
       const game = s.games.find((g) => g.id === a.gameId);
       if (!game) break;
-      const character = { id: id(), name: 'New character', collapsed: false, groups: [] };
+      const character = {
+        id: id(),
+        name: 'New character',
+        collapsed: false,
+        done: false,
+        cadence: 'daily',
+        periodStart: null,
+        groups: [],
+      };
       game.characters.push(character);
       game.collapsed = false;
       createdId = character.id;
@@ -357,6 +378,9 @@ function reduce(s, a) {
         id: id(),
         name: `${f.character.name} (copy)`,
         collapsed: false,
+        done: false,
+        cadence: f.character.cadence,
+        periodStart: null,
         groups: f.character.groups.map(cloneGroup),
       };
       f.game.characters.splice(f.index + 1, 0, copy);
@@ -421,7 +445,7 @@ function reduce(s, a) {
       if (time(p.dailyTime)) game.reset.dailyTime = p.dailyTime;
       if (time(p.weeklyTime)) game.reset.weeklyTime = p.weeklyTime;
       if (Number.isInteger(p.weeklyDay) && p.weeklyDay >= 0 && p.weeklyDay <= 6) game.reset.weeklyDay = p.weeklyDay;
-      restartPeriods(game, Date.now());
+      restartPeriods(s, game, Date.now());
       break;
     }
     case 'group.setCadence': {
@@ -429,6 +453,18 @@ function reduce(s, a) {
       if (!f || !CADENCES.includes(a.cadence)) break;
       f.group.cadence = a.cadence;
       f.group.periodStart = latestBoundary(Date.now(), a.cadence, f.game.reset);
+      break;
+    }
+    case 'character.toggle': {
+      const f = findCharacter(s, a.characterId);
+      if (f) f.character.done = !f.character.done;
+      break;
+    }
+    case 'character.setCadence': {
+      const f = findCharacter(s, a.characterId);
+      if (!f || !CADENCES.includes(a.cadence)) break;
+      f.character.cadence = a.cadence;
+      f.character.periodStart = latestBoundary(Date.now(), a.cadence, f.game.reset);
       break;
     }
     case 'settings.update': {

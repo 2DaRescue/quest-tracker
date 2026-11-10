@@ -53,11 +53,13 @@ describe('progress', () => {
       reset: { timezone: 'UTC', dailyTime: '00:00', weeklyDay: 1, weeklyTime: '00:00' },
       groups: [group(true)],
       characters: [
-        { id: 'a', name: 'Main', collapsed: false, groups: [group(true)] },
-        { id: 'b', name: 'Alt', collapsed: false, groups: [group(false)] },
+        { id: 'a', name: 'Main', collapsed: false, done: false, cadence: 'daily', periodStart: null, groups: [group(true)] },
+        { id: 'b', name: 'Alt', collapsed: false, done: false, cadence: 'daily', periodStart: null, groups: [group(false)] },
+        // A tick-off character with no groups counts as one item.
+        { id: 'c', name: 'Mule', collapsed: false, done: true, cadence: 'daily', periodStart: null, groups: [] },
       ],
     };
-    expect(gameProgress(game)).toEqual({ done: 2, total: 3 });
+    expect(gameProgress(game)).toEqual({ done: 3, total: 4 });
   });
 
   it('sums a boss list into a group total', () => {

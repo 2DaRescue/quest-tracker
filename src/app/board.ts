@@ -4,8 +4,12 @@ import { GroupList } from './group-list';
 import { Name } from './name';
 import { QuestStore } from './quest-store';
 import {
+  Cadence,
+  Character,
+  Game,
   Group,
   NodeKind,
+  isSimpleCharacter,
   cadencesUsed,
   characterProgress,
   dropIndex,
@@ -79,6 +83,30 @@ export class Board {
 
   protected async addCharacter(gameId: string) {
     this.edit(await this.store.dispatch({ type: 'character.add', gameId }));
+  }
+
+  protected readonly isSimpleCharacter = isSimpleCharacter;
+  protected readonly cadenceLabel: Record<Cadence, string> = { daily: 'D', weekly: 'W', none: '–' };
+  protected readonly cadenceTitle: Record<Cadence, string> = {
+    daily: 'Unticks at the daily reset',
+    weekly: 'Unticks at the weekly reset',
+    none: 'Manual (stays ticked)',
+  };
+
+  /** With "hide completed" on, ticked-off simple characters are hidden like finished tasks. */
+  protected visibleCharacters(game: Game) {
+    if (!this.store.state()?.settings.hideCompleted) return game.characters;
+    return game.characters.filter((c) => !(isSimpleCharacter(c) && c.done));
+  }
+
+  protected toggleCharacter(characterId: string) {
+    this.store.dispatch({ type: 'character.toggle', characterId });
+  }
+
+  protected cycleCharacterCadence(ch: Character) {
+    const order: Cadence[] = ['none', 'daily', 'weekly'];
+    const cadence = order[(order.indexOf(ch.cadence) + 1) % order.length];
+    this.store.dispatch({ type: 'character.setCadence', characterId: ch.id, cadence });
   }
 
   protected async duplicateCharacter(characterId: string) {

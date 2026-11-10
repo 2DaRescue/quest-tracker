@@ -31,6 +31,10 @@ export interface Character {
   id: string;
   name: string;
   collapsed: boolean;
+  /** Ticked off directly — used when the character has no groups. */
+  done: boolean;
+  cadence: Cadence;
+  periodStart: number | null;
   groups: Group[];
 }
 
@@ -71,6 +75,8 @@ export type Action =
   | { type: 'group.duplicate'; groupId: string; targetId?: string }
   | { type: 'character.add'; gameId: string }
   | { type: 'character.duplicate'; characterId: string }
+  | { type: 'character.toggle'; characterId: string }
+  | { type: 'character.setCadence'; characterId: string; cadence: Cadence }
   | { type: 'group.resetNow'; groupId: string }
   | { type: 'group.setCadence'; groupId: string; cadence: Cadence }
   | { type: 'game.setReset'; gameId: string; patch: Partial<ResetConfig> }
@@ -132,9 +138,15 @@ export function formatCountdown(ms: number): string {
 
 /** Which cadences any group in this game uses (to decide which countdowns to show). */
 export function cadencesUsed(game: Game): Set<Cadence> {
-  const all = [...game.groups, ...game.characters.flatMap((c) => c.groups)];
+  const all: { cadence: Cadence }[] = [
+    ...game.groups,
+    ...game.characters.flatMap((c): { cadence: Cadence }[] => (c.groups.length ? c.groups : [c])), // simple characters reset themselves
+  ];
   return new Set(all.map((g) => g.cadence));
 }
+
+/** Simple characters (no groups) are just a checkbox. */
+export const isSimpleCharacter = (c: Character) => c.groups.length === 0;
 
 export function isDone(t: Task): boolean {
   const p = taskProgress(t);
@@ -157,6 +169,7 @@ export function sumProgress(items: Progress[]): Progress {
 }
 
 export const groupProgress = (g: Group) => sumProgress(g.tasks.map(taskProgress));
-export const characterProgress = (c: Character) => sumProgress(c.groups.map(groupProgress));
+export const characterProgress = (c: Character): Progress =>
+  c.groups.length ? sumProgress(c.groups.map(groupProgress)) : { done: c.done ? 1 : 0, total: 1 };
 export const gameProgress = (g: Game) =>
   sumProgress([...g.groups.map(groupProgress), ...g.characters.map(characterProgress)]);

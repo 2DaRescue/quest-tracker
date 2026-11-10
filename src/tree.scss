@@ -164,6 +164,8 @@ input[type='checkbox'] {
 .value {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
+  white-space: nowrap;
+  flex: none;
   small {
     color: var(--muted);
     margin-left: 2px;
@@ -364,4 +366,21 @@ body.cdk-drag-active * {
 
 .row:hover > .cadence.none {
   opacity: 0.8;
+}
+
+// ---- simple (tick-off) characters ----
+
+.character-row.simple {
+  font-weight: 500;
+  margin-top: 0;
+}
+
+.character-row.done {
+  .name {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+  .avatar {
+    opacity: 0.5;
+  }
 }
