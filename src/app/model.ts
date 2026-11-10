@@ -45,6 +45,16 @@ export interface Game {
   reset: ResetConfig;
   groups: Group[]; // shared across the account
   characters: Character[];
+  timers: Timer[];
+}
+
+/** An event at fixed clock times, e.g. a world boss. Times are in the game's time zone. */
+export interface Timer {
+  id: string;
+  name: string;
+  times: string[]; // "HH:MM", sorted
+  days: number[]; // 0 = Sunday … 6; empty = every day
+  notify: boolean;
 }
 
 export interface Settings {
@@ -62,6 +72,8 @@ export interface AppState {
   settings: Settings;
   /** Derived by the main process: next reset instants (ms) per game id. */
   next: Record<string, { daily: number; weekly: number }>;
+  /** Derived: when each timer goes off next (ms), by timer id. */
+  timerNext: Record<string, number | null>;
 }
 
 export type Action =
@@ -80,6 +92,8 @@ export type Action =
   | { type: 'group.resetNow'; groupId: string }
   | { type: 'group.setCadence'; groupId: string; cadence: Cadence }
   | { type: 'game.setReset'; gameId: string; patch: Partial<ResetConfig> }
+  | { type: 'timer.add'; gameId: string }
+  | { type: 'timer.update'; timerId: string; patch: Partial<Omit<Timer, 'times'>> & { times?: string | string[] } }
   | { type: 'game.add' }
   | { type: 'node.rename'; id: string; name: string }
   | { type: 'node.delete'; id: string }

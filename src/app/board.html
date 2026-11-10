@@ -28,6 +28,8 @@
 
         @if (!game.collapsed) {
           <div class="children">
+            <qt-timers [game]="game" />
+
             <!-- Shared (account-wide) groups -->
             <qt-group-list [owner]="game" [game]="game" />
 
@@ -85,6 +87,7 @@
             <div class="add-links">
               <button class="add-link" (click)="addGroup(game.id)">{{ game.characters.length ? '+ shared group' : '+ group' }}</button>
               <button class="add-link" (click)="addCharacter(game.id)">+ character</button>
+              <button class="add-link" (click)="addTimer(game.id)">+ timer</button>
             </div>
           </div>
         }

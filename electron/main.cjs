@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell, powerMonitor } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell, powerMonitor, Notification } = require('electron');
 const path = require('node:path');
 const store = require('./store.cjs');
+const { latestOccurrence } = require('./schedule.cjs');
 
 const DEV = process.argv.includes('--dev');
 const DEV_URL = 'http://localhost:4200';
@@ -11,7 +12,8 @@ const BG = '#1d1f27';
 const OPEN_DELAY_MS = 300;
 const CLOSE_DELAY_MS = 700;
 const POLL_MS = 80;
-const RESET_CHECK_MS = 15_000;
+const CHECK_MS = 5_000; // resets, alarms and countdown refresh
+const ALARM_GRACE_MS = 2 * 60_000; // alarms missed by more than this (PC asleep) are skipped
 
 let tray = null;
 let widget = null;
@@ -282,6 +284,51 @@ function createTray() {
   );
 }
 
+// ---- timers / alarms -------------------------------------------------------
+
+const lastAlarm = new Map(); // timer id → occurrence we've already handled
+let lastTooltip = '';
+
+const clock = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+function inWords(ms) {
+  const min = Math.max(0, Math.ceil(ms / 60_000));
+  return min < 60 ? `${min}m` : `${Math.floor(min / 60)}h ${min % 60}m`;
+}
+
+function checkAlarms(now = Date.now()) {
+  const s = store.get();
+  let soonest = null;
+  for (const game of s.games)
+    for (const t of game.timers) {
+      const last = latestOccurrence(now, t.times, t.days, game.reset.timezone);
+      const prev = lastAlarm.get(t.id);
+      lastAlarm.set(t.id, last);
+      // First sighting (app start, new timer) only records; never alarm for the past.
+      const due = prev !== undefined && last !== null && last > prev && now - last <= ALARM_GRACE_MS;
+      if (due && t.notify) alarm(game, t, last);
+
+      const next = s.timerNext[t.id];
+      if (next && (!soonest || next < soonest.at)) soonest = { at: next, name: t.name };
+    }
+
+  const tooltip = soonest ? `Quest Tracker\nNext: ${soonest.name} at ${clock(soonest.at)} (in ${inWords(soonest.at - now)})` : 'Quest Tracker';
+  if (tooltip !== lastTooltip && tray) tray.setToolTip((lastTooltip = tooltip));
+}
+
+/** `--test-alarm`: show a sample notification so you can check sound/permissions. */
+function testAlarm() {
+  alarm({ name: 'Test' }, { name: 'Timer alarm test' }, Date.now());
+}
+
+function alarm(game, timer, at) {
+  console.log(`[alarm] ${game.name} / ${timer.name} at ${new Date(at).toISOString()}`);
+  if (!Notification.isSupported()) return console.warn('[alarm] notifications not supported on this system');
+  const n = new Notification({ title: `⏰ ${timer.name}`, body: `${game.name} · ${clock(at)}`, silent: false, icon: makeIcon() });
+  n.on('click', showWidget);
+  n.show();
+}
+
 // ---- IPC -------------------------------------------------------------------
 
 function registerIpc() {
@@ -327,10 +374,16 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     if (process.argv.includes('--editor')) openEditor();
 
-    // Reset checks: frequent polling plus an immediate check on wake/unlock,
-    // since timers don't run while the PC sleeps.
-    setInterval(() => store.tick(), RESET_CHECK_MS);
-    for (const event of ['resume', 'unlock-screen']) powerMonitor.on(event, () => store.tick());
+    // Resets and alarms: frequent polling plus an immediate check on wake/unlock,
+    // since JS timers don't run while the PC sleeps.
+    const check = () => {
+      store.tick();
+      checkAlarms();
+    };
+    check();
+    setInterval(check, CHECK_MS);
+    for (const event of ['resume', 'unlock-screen']) powerMonitor.on(event, check);
+    if (process.argv.includes('--test-alarm')) setTimeout(testAlarm, 1500);
   });
   app.on('before-quit', () => {
     quitting = true;

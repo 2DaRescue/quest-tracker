@@ -2,6 +2,7 @@ import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/d
 import { Component, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { GroupList } from './group-list';
 import { Name } from './name';
+import { Timers } from './timers';
 import { QuestStore } from './quest-store';
 import {
   Cadence,
@@ -21,7 +22,7 @@ import {
 /** The whole tree: games → (shared groups, characters → groups) → tasks. */
 @Component({
   selector: 'qt-board',
-  imports: [CdkDropList, CdkDrag, CdkDragHandle, GroupList, Name],
+  imports: [CdkDropList, CdkDrag, CdkDragHandle, GroupList, Name, Timers],
   templateUrl: './board.html',
   host: {
     '(focusin)': 'onFocus($event, true)',
@@ -111,6 +112,10 @@ export class Board {
 
   protected async duplicateCharacter(characterId: string) {
     this.edit(await this.store.dispatch({ type: 'character.duplicate', characterId }));
+  }
+
+  protected async addTimer(gameId: string) {
+    this.edit(await this.store.dispatch({ type: 'timer.add', gameId }));
   }
 
   protected async addGame() {

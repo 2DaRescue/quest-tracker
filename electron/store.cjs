@@ -5,9 +5,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const { latestBoundary, nextBoundary, isValidTimeZone, defaultResetConfig } = require('./schedule.cjs');
+const { latestBoundary, nextBoundary, nextOccurrence, isValidTimeZone, defaultResetConfig } = require('./schedule.cjs');
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const MAX_TIMER_TIMES = 48;
 const MIN_OPACITY = 0.4;
 const RESET_LOG_MAX = 200;
 const CADENCES = ['none', 'daily', 'weekly'];
@@ -46,6 +48,7 @@ function seed() {
           group('Weekly Bosses', 'weekly', ['Ember Drake', 'Hollow King', 'Tide Warden', 'Stone Colossus'].map(check)),
         ],
         characters: [],
+        timers: [{ id: id(), name: 'World boss', times: ['12:00', '18:00', '21:00'], days: [], notify: true }],
       },
     ],
     settings: { opacity: 1, widgetBounds: null, hideCompleted: false, launchAtStartup: false },
@@ -77,6 +80,10 @@ function migrate(s) {
     for (const game of s.games)
       for (const ch of game.characters) Object.assign(ch, { done: false, cadence: 'daily', periodStart: null });
     s.version = 4;
+  }
+  if (s.version === 4) {
+    for (const game of s.games) game.timers = [];
+    s.version = 5;
   }
   return s;
 }
@@ -139,12 +146,18 @@ function* resettables(s) {
     for (const ch of game.characters) yield { game, item: ch, reset: () => (ch.done = false) };
 }
 
-/** Next daily/weekly reset per game, for countdowns. Derived; never saved. */
+/**
+ * Derived, never saved: next daily/weekly reset per game (`next`) and the
+ * next time each timer goes off (`timerNext`), for countdowns.
+ */
 function nextResets(s, now) {
-  const out = {};
-  for (const game of s.games)
-    out[game.id] = { daily: nextBoundary(now, 'daily', game.reset), weekly: nextBoundary(now, 'weekly', game.reset) };
-  return out;
+  const next = {};
+  const timerNext = {};
+  for (const game of s.games) {
+    next[game.id] = { daily: nextBoundary(now, 'daily', game.reset), weekly: nextBoundary(now, 'weekly', game.reset) };
+    for (const t of game.timers) timerNext[t.id] = nextOccurrence(now, t.times, t.days, game.reset.timezone);
+  }
+  return { next, timerNext };
 }
 
 /** Re-anchor groups after a schedule change so editing a time never triggers a surprise reset. */
@@ -166,7 +179,7 @@ function tick(now = Date.now()) {
 
 /** What windows see: saved state plus derived countdown targets. */
 function view() {
-  return { ...state, next: nextResets(state, Date.now()) };
+  return { ...state, ...nextResets(state, Date.now()) };
 }
 
 function emit(action) {
@@ -233,8 +246,33 @@ function findOwner(s, ownerId) {
   return null;
 }
 
+function findTimer(s, timerId) {
+  for (const game of s.games) {
+    const i = game.timers.findIndex((t) => t.id === timerId);
+    if (i >= 0) return { game, timer: game.timers[i], index: i };
+  }
+  return null;
+}
+
 function findNode(s, nodeId) {
-  return findOwner(s, nodeId) ?? findGroup(s, nodeId)?.group ?? null;
+  return findOwner(s, nodeId) ?? findGroup(s, nodeId)?.group ?? findTimer(s, nodeId)?.timer ?? null;
+}
+
+/** "12:00, 6:30pm" or ["12:00"] → sorted unique "HH:MM" list; invalid entries dropped. */
+function cleanTimes(input) {
+  const raw = Array.isArray(input) ? input : String(input ?? '').split(/[,;\s]+/);
+  const out = new Set();
+  for (const r of raw) {
+    const m = String(r).trim().toLowerCase().match(/^(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?$/);
+    if (!m) continue;
+    let h = +m[1];
+    const mi = +(m[2] ?? 0);
+    if (m[3] === 'pm' && h < 12) h += 12;
+    if (m[3] === 'am' && h === 12) h = 0;
+    const t = `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
+    if (TIME_RE.test(t)) out.add(t);
+  }
+  return [...out].sort().slice(0, MAX_TIMER_TIMES);
 }
 
 /** The list an item currently lives in, and its position there. */
@@ -393,7 +431,15 @@ function reduce(s, a) {
       break;
     }
     case 'game.add': {
-      const game = { id: id(), name: 'New game', collapsed: false, reset: defaultResetConfig(), groups: [], characters: [] };
+      const game = {
+        id: id(),
+        name: 'New game',
+        collapsed: false,
+        reset: defaultResetConfig(),
+        groups: [],
+        characters: [],
+        timers: [],
+      };
       s.games.push(game);
       createdId = game.id;
       break;
@@ -414,8 +460,35 @@ function reduce(s, a) {
         c.game.characters.splice(c.index, 1);
         break;
       }
+      const t = findTimer(s, a.id);
+      if (t) {
+        t.game.timers.splice(t.index, 1);
+        break;
+      }
       const f = findGroup(s, a.id);
       if (f) f.owner.groups.splice(f.index, 1);
+      break;
+    }
+    case 'timer.add': {
+      const game = s.games.find((g) => g.id === a.gameId);
+      if (!game) break;
+      const timer = { id: id(), name: 'New timer', times: ['12:00'], days: [], notify: true };
+      game.timers.push(timer);
+      game.collapsed = false;
+      createdId = timer.id;
+      break;
+    }
+    case 'timer.update': {
+      const f = findTimer(s, a.timerId);
+      if (!f) break;
+      const p = a.patch ?? {};
+      if (p.times !== undefined) {
+        const times = cleanTimes(p.times);
+        if (times.length) f.timer.times = times; // never leave a timer with nothing to fire on
+      }
+      if (Array.isArray(p.days)) f.timer.days = [...new Set(p.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+      if (typeof p.notify === 'boolean') f.timer.notify = p.notify;
+      if (typeof p.name === 'string') f.timer.name = cleanName(p.name, f.timer.name);
       break;
     }
     case 'node.toggleCollapse': {
@@ -440,7 +513,7 @@ function reduce(s, a) {
       const game = s.games.find((g) => g.id === a.gameId);
       if (!game) break;
       const p = a.patch ?? {};
-      const time = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+      const time = (v) => typeof v === 'string' && TIME_RE.test(v);
       if (typeof p.timezone === 'string' && isValidTimeZone(p.timezone)) game.reset.timezone = p.timezone;
       if (time(p.dailyTime)) game.reset.dailyTime = p.dailyTime;
       if (time(p.weeklyTime)) game.reset.weeklyTime = p.weeklyTime;

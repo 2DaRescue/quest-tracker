@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { latestBoundary, nextBoundary } = require('./schedule.cjs');
+const { latestBoundary, nextBoundary, nextOccurrence, latestOccurrence } = require('./schedule.cjs');
 
 const iso = (ms) => new Date(ms).toISOString();
 const at = (s) => Date.parse(s);
@@ -43,6 +43,31 @@ test('month and year rollover', () => {
   assert.equal(iso(latestBoundary(at('2026-12-31T23:00Z'), 'daily', cfg)), '2026-12-31T00:00:00.000Z');
   // 2027-01-01 is a Friday → previous Thursday is 2026-12-31
   assert.equal(iso(latestBoundary(at('2027-01-02T00:00Z'), 'weekly', cfg)), '2026-12-31T00:00:00.000Z');
+});
+
+test('timer: several times a day', () => {
+  const times = ['21:00', '12:00', '18:00']; // order doesn't matter
+  assert.equal(iso(nextOccurrence(at('2026-11-11T11:00Z'), times, [], 'UTC')), '2026-11-11T12:00:00.000Z');
+  assert.equal(iso(nextOccurrence(at('2026-11-11T12:00Z'), times, [], 'UTC')), '2026-11-11T18:00:00.000Z', 'strictly after');
+  assert.equal(iso(nextOccurrence(at('2026-11-11T22:00Z'), times, [], 'UTC')), '2026-11-12T12:00:00.000Z', 'rolls to tomorrow');
+  assert.equal(iso(latestOccurrence(at('2026-11-11T19:30Z'), times, [], 'UTC')), '2026-11-11T18:00:00.000Z');
+});
+
+test('timer: only on chosen weekdays', () => {
+  // Saturday and Sunday at 20:00; 2026-11-11 is a Wednesday.
+  assert.equal(iso(nextOccurrence(at('2026-11-11T00:00Z'), ['20:00'], [6, 0], 'UTC')), '2026-11-14T20:00:00.000Z');
+  assert.equal(iso(nextOccurrence(at('2026-11-14T20:00Z'), ['20:00'], [6, 0], 'UTC')), '2026-11-15T20:00:00.000Z');
+  assert.equal(iso(latestOccurrence(at('2026-11-11T00:00Z'), ['20:00'], [6, 0], 'UTC')), '2026-11-08T20:00:00.000Z');
+});
+
+test('timer: uses the game time zone', () => {
+  // 19:00 in Tokyo = 10:00 UTC
+  assert.equal(iso(nextOccurrence(at('2026-11-11T09:00Z'), ['19:00'], [], 'Asia/Tokyo')), '2026-11-11T10:00:00.000Z');
+});
+
+test('timer with no times never fires', () => {
+  assert.equal(nextOccurrence(Date.now(), [], [], 'UTC'), null);
+  assert.equal(latestOccurrence(Date.now(), [], [], 'UTC'), null);
 });
 
 test('manual groups never reset', () => {

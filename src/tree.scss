@@ -384,3 +384,109 @@ body.cdk-drag-active * {
     opacity: 0.5;
   }
 }
+
+// ---- timers ----
+
+qt-timers {
+  display: block;
+}
+
+.timer-row {
+  font-size: 13px;
+
+  .timer-icon {
+    width: 14px;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  &.soon {
+    .at,
+    .in {
+      color: var(--accent);
+      font-weight: 600;
+    }
+  }
+}
+
+.timer-when {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  &:hover {
+    background: var(--input);
+  }
+  .at {
+    font-size: 12px;
+  }
+  .in {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 44px;
+    text-align: right;
+  }
+}
+
+.bell {
+  width: 20px;
+  font-size: 11px;
+  &.off {
+    opacity: 0.45;
+  }
+}
+
+.timer-edit {
+  margin: 0 0 6px 22px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--hover);
+  font-size: 12px;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: var(--muted);
+  }
+
+  input.times {
+    font: inherit;
+    color: var(--text);
+    background: var(--input);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 3px 6px;
+    user-select: text;
+    &:focus {
+      outline: 1px solid var(--accent);
+    }
+  }
+
+  .days {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 6px;
+    button {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: var(--input);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      &.on {
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+    }
+    small {
+      margin-left: 4px;
+      color: var(--muted);
+    }
+  }
+}

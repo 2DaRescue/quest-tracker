@@ -60,12 +60,12 @@ test('migrates a v1 file, keeps a backup, guesses cadence from group names', () 
     settings: { opacity: 1, widgetBounds: null },
   });
   const s = store.get();
-  assert.equal(s.version, 4);
+  assert.equal(s.version, 5);
   assert.deepEqual(s.games[0].characters, []);
   assert.deepEqual(s.games[0].groups.map((g) => g.cadence), ['daily', 'weekly', 'none']);
   assert.equal(s.games[0].groups[0].tasks[0].checked, true, 'migration never resets progress');
   assert.ok(fs.existsSync(`${dataFile()}.v1.bak`));
-  assert.equal(JSON.parse(fs.readFileSync(dataFile())).version, 4, 'saved right away');
+  assert.equal(JSON.parse(fs.readFileSync(dataFile())).version, 5, 'saved right away');
 });
 
 test('characters can be ticked off directly and reset on their own cadence', () => {
@@ -205,4 +205,34 @@ test('view includes next reset times; saved file does not', () => {
   store.dispatch({ type: 'game.add' });
   store.flush();
   assert.equal(JSON.parse(fs.readFileSync(dataFile())).next, undefined);
+});
+
+test('timers: add, edit times/days/alarm, rename, delete', () => {
+  const store = loadStore(v3([]));
+  assert.deepEqual(store.get().games[0].timers, [], 'migration adds an empty timer list');
+
+  const t = store.dispatch({ type: 'timer.add', gameId: 'g1' }).createdId;
+  const timer = () => store.get().games[0].timers.find((x) => x.id === t);
+  assert.deepEqual(timer().times, ['12:00']);
+
+  // Flexible time entry: commas or spaces, 12-hour times, duplicates, junk.
+  store.dispatch({ type: 'timer.update', timerId: t, patch: { times: '21:00, 6pm 9:30am,18:00 nonsense 25:00' } });
+  assert.deepEqual(timer().times, ['09:30', '18:00', '21:00']);
+
+  store.dispatch({ type: 'timer.update', timerId: t, patch: { times: 'garbage' } });
+  assert.deepEqual(timer().times, ['09:30', '18:00', '21:00'], 'an all-invalid edit is ignored');
+
+  store.dispatch({ type: 'timer.update', timerId: t, patch: { days: [6, 0, 0, 9], notify: false } });
+  assert.deepEqual(timer().days, [0, 6]);
+  assert.equal(timer().notify, false);
+
+  store.dispatch({ type: 'node.rename', id: t, name: 'World boss' });
+  assert.equal(timer().name, 'World boss');
+
+  const next = store.get().timerNext[t];
+  assert.ok(next > Date.now() && next <= Date.now() + 8 * DAY, 'next occurrence is exposed for countdowns');
+  assert.equal(new Date(next).getUTCDay() % 6, 0, 'next one is on a weekend');
+
+  store.dispatch({ type: 'node.delete', id: t });
+  assert.equal(store.get().games[0].timers.length, 0);
 });

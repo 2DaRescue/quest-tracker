@@ -51,6 +51,7 @@ describe('progress', () => {
       name: 'Game',
       collapsed: false,
       reset: { timezone: 'UTC', dailyTime: '00:00', weeklyDay: 1, weeklyTime: '00:00' },
+      timers: [],
       groups: [group(true)],
       characters: [
         { id: 'a', name: 'Main', collapsed: false, done: false, cadence: 'daily', periodStart: null, groups: [group(true)] },

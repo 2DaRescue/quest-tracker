@@ -96,6 +96,35 @@ function nextBoundary(now, cadence, cfg) {
   return zoned(p.y, p.m, p.d + r.step, r.time[0], r.time[1], cfg.timezone);
 }
 
+// ---- timers: events at fixed clock times, e.g. world bosses ----------------
+
+/** Every occurrence of `times` on local days now-8…now+8 that falls on one of `days` (empty = every day). */
+function* occurrences(now, times, days, tz) {
+  const p = parts(now, tz);
+  for (let k = -8; k <= 8; k++) {
+    const weekday = new Date(Date.UTC(p.y, p.m - 1, p.d + k)).getUTCDay();
+    if (days.length && !days.includes(weekday)) continue;
+    for (const t of times) {
+      const [h, mi] = hm(t);
+      yield zoned(p.y, p.m, p.d + k, h, mi, tz);
+    }
+  }
+}
+
+/** Next time the timer goes off strictly after `now`, or null if it has no times. */
+function nextOccurrence(now, times, days, tz) {
+  let best = null;
+  for (const at of occurrences(now, times, days, tz)) if (at > now && (best === null || at < best)) best = at;
+  return best;
+}
+
+/** Most recent time the timer went off at or before `now`, or null. */
+function latestOccurrence(now, times, days, tz) {
+  let best = null;
+  for (const at of occurrences(now, times, days, tz)) if (at <= now && (best === null || at > best)) best = at;
+  return best;
+}
+
 function defaultResetConfig() {
   return {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -105,4 +134,11 @@ function defaultResetConfig() {
   };
 }
 
-module.exports = { latestBoundary, nextBoundary, isValidTimeZone, defaultResetConfig };
+module.exports = {
+  latestBoundary,
+  nextBoundary,
+  nextOccurrence,
+  latestOccurrence,
+  isValidTimeZone,
+  defaultResetConfig,
+};
