@@ -25,7 +25,16 @@ const pop = { pinned: false, editing: false, openTimer: null, poll: null, outsid
 
 // ---- helpers ---------------------------------------------------------------
 
+const POPUP_SIZE = { width: 340, height: 480 };
+const scaleOf = () => store.get().settings.scale ?? 1;
+
+/** Text size: zoom the page itself. Re-applied on every load because Chromium resets it. */
+function applyZoom(win) {
+  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(scaleOf());
+}
+
 function load(win, view) {
+  win.webContents.on('did-finish-load', () => applyZoom(win));
   if (DEV) win.loadURL(`${DEV_URL}/#${view}`);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'quest-tracker', 'browser', 'index.html'), { hash: view });
 }
@@ -166,8 +175,8 @@ function applyLaunchAtStartup(enabled) {
 
 function createPopup() {
   popup = new BrowserWindow({
-    width: 340,
-    height: 480,
+    width: Math.round(POPUP_SIZE.width * scaleOf()),
+    height: Math.round(POPUP_SIZE.height * scaleOf()),
     frame: false,
     show: false,
     skipTaskbar: true,
@@ -350,12 +359,37 @@ function registerIpc() {
     else win?.hide();
   });
 
+  let lastScale = scaleOf();
   store.subscribe((state, action) => {
     broadcast('state:changed', state);
     if (action.type !== 'settings.update') return;
     if (widget && !widget.isDestroyed()) widget.setOpacity(state.settings.opacity);
+    if (state.settings.scale !== undefined && state.settings.scale !== lastScale) rescale(lastScale, (lastScale = state.settings.scale));
     if (typeof action.patch?.launchAtStartup === 'boolean') applyLaunchAtStartup(state.settings.launchAtStartup);
   });
+}
+
+/** New text size: zoom every window and grow/shrink the widget and popup to match. */
+function rescale(from, to) {
+  for (const win of [widget, popup, editor]) applyZoom(win);
+  if (popup && !popup.isDestroyed()) {
+    popup.setSize(Math.round(POPUP_SIZE.width * to), Math.round(POPUP_SIZE.height * to));
+    if (popup.isVisible()) positionPopup();
+  }
+  if (widget && !widget.isDestroyed()) {
+    const b = widget.getBounds();
+    const wa = screen.getDisplayMatching(b).workArea;
+    const width = Math.min(Math.round((b.width * to) / from), wa.width);
+    const height = Math.min(Math.round((b.height * to) / from), wa.height);
+    // Keep the widget on its screen, growing left/up if it would run off the edge.
+    const x = clamp(b.x, wa.x, wa.x + wa.width - width);
+    const y = clamp(b.y, wa.y, wa.y + wa.height - height);
+    widget.setBounds({ x, y, width, height });
+    // Programmatic resizes don't fire 'resized', so save the new size ourselves.
+    setImmediate(() => {
+      if (!widget.isDestroyed()) store.dispatch({ type: 'settings.update', patch: { widgetBounds: widget.getBounds() } });
+    });
+  }
 }
 
 // ---- lifecycle -------------------------------------------------------------

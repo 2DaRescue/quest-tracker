@@ -60,6 +60,8 @@ export interface Timer {
 export interface Settings {
   opacity: number;
   widgetBounds: { x: number; y: number; width: number; height: number } | null;
+  /** Zoom for all windows; 1 = 100%. */
+  scale?: number;
   hideCompleted?: boolean;
   launchAtStartup?: boolean;
   /** Ask before deleting games/characters/groups/timers. Missing = true. */

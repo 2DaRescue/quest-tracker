@@ -11,6 +11,8 @@ const SCHEMA_VERSION = 5;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_TIMER_TIMES = 48;
 const MIN_OPACITY = 0.4;
+const MIN_SCALE = 0.75;
+const MAX_SCALE = 2;
 const RESET_LOG_MAX = 200;
 const CADENCES = ['none', 'daily', 'weekly'];
 
@@ -546,6 +548,7 @@ function reduce(s, a) {
       if (typeof p.launchAtStartup === 'boolean') s.settings.launchAtStartup = p.launchAtStartup;
       if (typeof p.confirmDelete === 'boolean') s.settings.confirmDelete = p.confirmDelete;
       if (typeof p.opacity === 'number') s.settings.opacity = clamp(p.opacity, MIN_OPACITY, 1);
+      if (typeof p.scale === 'number' && Number.isFinite(p.scale)) s.settings.scale = clamp(p.scale, MIN_SCALE, MAX_SCALE);
       if (p.widgetBounds) s.settings.widgetBounds = p.widgetBounds;
       break;
     }

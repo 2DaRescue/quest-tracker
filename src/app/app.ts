@@ -38,6 +38,8 @@ export class App {
     this.store.api?.onPinned((p) => this.pinned.set(p));
   }
 
+  protected readonly scales = [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+
   protected readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   protected readonly timeZones = listTimeZones();
 
