@@ -5,8 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const SCHEMA_VERSION = 2;
+const { latestBoundary, nextBoundary, isValidTimeZone, defaultResetConfig } = require('./schedule.cjs');
+
+const SCHEMA_VERSION = 3;
 const MIN_OPACITY = 0.4;
+const RESET_LOG_MAX = 200;
+const CADENCES = ['none', 'daily', 'weekly'];
 
 let state;
 let file;
@@ -17,6 +21,7 @@ const id = () => crypto.randomUUID();
 
 function seed() {
   const check = (name) => ({ id: id(), name, kind: 'check', checked: false });
+  const group = (name, cadence, tasks) => ({ id: id(), name, collapsed: false, cadence, periodStart: null, tasks });
   return {
     version: SCHEMA_VERSION,
     games: [
@@ -24,33 +29,27 @@ function seed() {
         id: id(),
         name: 'Example Game',
         collapsed: false,
+        reset: defaultResetConfig(),
         groups: [
-          {
-            id: id(),
-            name: 'Daily Quests',
-            collapsed: false,
-            tasks: ['D1', 'D2', 'D3', 'D4', 'D5'].map(check),
-          },
+          group('Daily Quests', 'daily', ['D1', 'D2', 'D3', 'D4', 'D5'].map(check)),
           {
             id: id(),
             name: 'Dungeons',
             collapsed: false,
+            cadence: 'daily',
+            periodStart: null,
             tasks: [
               { id: id(), name: 'Dungeon clears', kind: 'counter', value: 2, target: 5 },
               { id: id(), name: 'Dungeon entries', kind: 'remaining', value: 3, target: 5 },
             ],
           },
-          {
-            id: id(),
-            name: 'Weekly Bosses',
-            collapsed: false,
-            tasks: ['Ember Drake', 'Hollow King', 'Tide Warden', 'Stone Colossus'].map(check),
-          },
+          group('Weekly Bosses', 'weekly', ['Ember Drake', 'Hollow King', 'Tide Warden', 'Stone Colossus'].map(check)),
         ],
         characters: [],
       },
     ],
     settings: { opacity: 1, widgetBounds: null, hideCompleted: false, launchAtStartup: false },
+    resetLog: [],
   };
 }
 
@@ -59,6 +58,19 @@ function migrate(s) {
   if (s.version === 1) {
     for (const game of s.games) game.characters = [];
     s.version = 2;
+  }
+  if (s.version === 2) {
+    // Reset engine: each game gets a schedule; guess each group's cadence from its name.
+    for (const game of s.games) {
+      game.reset = defaultResetConfig();
+      for (const owner of [game, ...game.characters])
+        for (const g of owner.groups) {
+          g.cadence = /daily|dailies/i.test(g.name) ? 'daily' : /weekly|weeklies/i.test(g.name) ? 'weekly' : 'none';
+          g.periodStart = null; // set to the current period on load, so nothing resets immediately
+        }
+    }
+    s.resetLog = [];
+    s.version = 3;
   }
   return s;
 }
@@ -71,15 +83,83 @@ function init() {
     if (oldVersion < SCHEMA_VERSION) fs.copyFileSync(file, `${file}.v${oldVersion}.bak`);
     state = migrate(loaded);
     if (state?.version !== SCHEMA_VERSION || !Array.isArray(state.games)) throw new Error('bad schema');
-    if (oldVersion !== SCHEMA_VERSION) saveNow();
+    // Catch up on resets that passed while the app wasn't running.
+    if (applyResets(state, Date.now()) || oldVersion !== SCHEMA_VERSION) saveNow();
   } catch (err) {
     if (err.code !== 'ENOENT' && fs.existsSync(file)) {
       // Keep the unreadable file instead of silently overwriting the user's data.
       fs.renameSync(file, `${file}.corrupt-${Date.now()}`);
     }
     state = seed();
+    applyResets(state, Date.now());
     saveNow();
   }
+  lastNextKey = JSON.stringify(nextResets(state, Date.now()));
+}
+
+// ---- reset engine ---------------------------------------------------------
+
+/**
+ * Reset every group whose most recent reset boundary is newer than the one it
+ * last processed. Idempotent: running it twice in a row changes nothing, and
+ * any number of missed boundaries (PC off for a week) collapse into one reset.
+ * Returns true if anything changed.
+ */
+function applyResets(s, now) {
+  let changed = false;
+  for (const { game, owner } of groupOwners(s))
+    for (const g of owner.groups) {
+      const boundary = latestBoundary(now, g.cadence, game.reset);
+      if (boundary === null) continue;
+      if (g.periodStart == null) {
+        g.periodStart = boundary; // newly scheduled: start tracking from the current period
+        changed = true;
+      } else if (boundary > g.periodStart) {
+        g.tasks.forEach(resetTask);
+        s.resetLog.push({ groupId: g.id, group: g.name, owner: owner.name, boundary, at: now });
+        g.periodStart = boundary;
+        changed = true;
+      }
+    }
+  if (s.resetLog.length > RESET_LOG_MAX) s.resetLog.splice(0, s.resetLog.length - RESET_LOG_MAX);
+  return changed;
+}
+
+/** Next daily/weekly reset per game, for countdowns. Derived; never saved. */
+function nextResets(s, now) {
+  const out = {};
+  for (const game of s.games)
+    out[game.id] = { daily: nextBoundary(now, 'daily', game.reset), weekly: nextBoundary(now, 'weekly', game.reset) };
+  return out;
+}
+
+/** Re-anchor groups after a schedule change so editing a time never triggers a surprise reset. */
+function restartPeriods(game, now) {
+  for (const owner of [game, ...game.characters])
+    for (const g of owner.groups) g.periodStart = latestBoundary(now, g.cadence, game.reset);
+}
+
+let lastNextKey = '';
+
+/** Called periodically and on wake. Applies due resets and refreshes countdowns. */
+function tick(now = Date.now()) {
+  const changed = applyResets(state, now);
+  const nextKey = JSON.stringify(nextResets(state, now));
+  if (!changed && nextKey === lastNextKey) return;
+  lastNextKey = nextKey;
+  if (changed) scheduleSave();
+  emit({ type: 'tick' });
+}
+
+/** What windows see: saved state plus derived countdown targets. */
+function view() {
+  return { ...state, next: nextResets(state, Date.now()) };
+}
+
+function emit(action) {
+  const v = view();
+  for (const fn of listeners) fn(v, action);
+  return v;
 }
 
 function saveNow() {
@@ -178,6 +258,7 @@ function childList(s, kind, parentId) {
 function cloneGroup(group) {
   const copy = structuredClone(group);
   copy.id = id();
+  copy.periodStart = null; // picks up the current period on the next reset check
   for (const t of copy.tasks) {
     t.id = id();
     resetTask(t);
@@ -242,7 +323,7 @@ function reduce(s, a) {
     case 'group.add': {
       const owner = findOwner(s, a.parentId);
       if (!owner) break;
-      const group = { id: id(), name: 'New group', collapsed: false, tasks: [] };
+      const group = { id: id(), name: 'New group', collapsed: false, cadence: 'none', periodStart: null, tasks: [] };
       owner.groups.push(group);
       owner.collapsed = false;
       createdId = group.id;
@@ -288,7 +369,7 @@ function reduce(s, a) {
       break;
     }
     case 'game.add': {
-      const game = { id: id(), name: 'New game', collapsed: false, groups: [], characters: [] };
+      const game = { id: id(), name: 'New game', collapsed: false, reset: defaultResetConfig(), groups: [], characters: [] };
       s.games.push(game);
       createdId = game.id;
       break;
@@ -324,8 +405,30 @@ function reduce(s, a) {
       const src = locate(s, a.kind, a.id);
       const dest = childList(s, a.kind, a.toParentId);
       if (!src || !dest) break;
+      const fromGame = a.kind === 'group' ? findGroup(s, a.id).game : null;
       const [item] = src.list.splice(src.index, 1);
       dest.splice(clamp(a.index, 0, dest.length), 0, item);
+      // A group moved to another game follows that game's schedule from now on.
+      if (fromGame && findGroup(s, a.id).game !== fromGame) item.periodStart = null;
+      break;
+    }
+    case 'game.setReset': {
+      const game = s.games.find((g) => g.id === a.gameId);
+      if (!game) break;
+      const p = a.patch ?? {};
+      const time = (v) => typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+      if (typeof p.timezone === 'string' && isValidTimeZone(p.timezone)) game.reset.timezone = p.timezone;
+      if (time(p.dailyTime)) game.reset.dailyTime = p.dailyTime;
+      if (time(p.weeklyTime)) game.reset.weeklyTime = p.weeklyTime;
+      if (Number.isInteger(p.weeklyDay) && p.weeklyDay >= 0 && p.weeklyDay <= 6) game.reset.weeklyDay = p.weeklyDay;
+      restartPeriods(game, Date.now());
+      break;
+    }
+    case 'group.setCadence': {
+      const f = findGroup(s, a.groupId);
+      if (!f || !CADENCES.includes(a.cadence)) break;
+      f.group.cadence = a.cadence;
+      f.group.periodStart = latestBoundary(Date.now(), a.cadence, f.game.reset);
       break;
     }
     case 'settings.update': {
@@ -345,16 +448,18 @@ function reduce(s, a) {
 function dispatch(action) {
   const next = structuredClone(state);
   const createdId = reduce(next, action);
+  applyResets(next, Date.now()); // anchor new/copied groups to the current period
   state = next;
+  lastNextKey = JSON.stringify(nextResets(state, Date.now()));
   scheduleSave();
-  for (const fn of listeners) fn(state, action);
-  return { state, createdId };
+  return { state: emit(action), createdId };
 }
 
 module.exports = {
   init,
   flush,
   dispatch,
-  get: () => state,
+  tick,
+  get: view,
   subscribe: (fn) => (listeners.add(fn), () => listeners.delete(fn)),
 };

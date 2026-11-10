@@ -9,11 +9,22 @@ export interface Task {
   target?: number; // counter / remaining: maximum
 }
 
+export type Cadence = 'none' | 'daily' | 'weekly';
+
 export interface Group {
   id: string;
   name: string;
   collapsed: boolean;
+  cadence: Cadence;
+  periodStart: number | null; // last reset boundary applied (ms)
   tasks: Task[];
+}
+
+export interface ResetConfig {
+  timezone: string; // IANA, e.g. "America/New_York" or "UTC"
+  dailyTime: string; // "HH:MM" in that time zone
+  weeklyDay: number; // 0 = Sunday … 6 = Saturday
+  weeklyTime: string;
 }
 
 export interface Character {
@@ -27,6 +38,7 @@ export interface Game {
   id: string;
   name: string;
   collapsed: boolean;
+  reset: ResetConfig;
   groups: Group[]; // shared across the account
   characters: Character[];
 }
@@ -44,6 +56,8 @@ export interface AppState {
   version: number;
   games: Game[];
   settings: Settings;
+  /** Derived by the main process: next reset instants (ms) per game id. */
+  next: Record<string, { daily: number; weekly: number }>;
 }
 
 export type Action =
@@ -58,6 +72,8 @@ export type Action =
   | { type: 'character.add'; gameId: string }
   | { type: 'character.duplicate'; characterId: string }
   | { type: 'group.resetNow'; groupId: string }
+  | { type: 'group.setCadence'; groupId: string; cadence: Cadence }
+  | { type: 'game.setReset'; gameId: string; patch: Partial<ResetConfig> }
   | { type: 'game.add' }
   | { type: 'node.rename'; id: string; name: string }
   | { type: 'node.delete'; id: string }
@@ -103,6 +119,21 @@ export function taskProgress(t: Task): Progress {
     case 'remaining':
       return { done: (t.target ?? 0) - (t.value ?? 0), total: t.target ?? 0 };
   }
+}
+
+/** "42m", "5h 12m", "2d 4h" — compact countdown text. */
+export function formatCountdown(ms: number): string {
+  const min = Math.max(0, Math.ceil(ms / 60_000));
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h ${min % 60}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}
+
+/** Which cadences any group in this game uses (to decide which countdowns to show). */
+export function cadencesUsed(game: Game): Set<Cadence> {
+  const all = [...game.groups, ...game.characters.flatMap((c) => c.groups)];
+  return new Set(all.map((g) => g.cadence));
 }
 
 export function isDone(t: Task): boolean {

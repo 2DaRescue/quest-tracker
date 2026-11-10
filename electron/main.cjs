@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, shell, powerMonitor } = require('electron');
 const path = require('node:path');
 const store = require('./store.cjs');
 
@@ -11,6 +11,7 @@ const BG = '#1d1f27';
 const OPEN_DELAY_MS = 300;
 const CLOSE_DELAY_MS = 700;
 const POLL_MS = 80;
+const RESET_CHECK_MS = 15_000;
 
 let tray = null;
 let widget = null;
@@ -325,6 +326,11 @@ if (!app.requestSingleInstanceLock()) {
     createPopup();
     createTray();
     if (process.argv.includes('--editor')) openEditor();
+
+    // Reset checks: frequent polling plus an immediate check on wake/unlock,
+    // since timers don't run while the PC sleeps.
+    setInterval(() => store.tick(), RESET_CHECK_MS);
+    for (const event of ['resume', 'unlock-screen']) powerMonitor.on(event, () => store.tick());
   });
   app.on('before-quit', () => {
     quitting = true;

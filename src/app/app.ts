@@ -1,11 +1,18 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Board } from './board';
 import { QuestStore } from './quest-store';
-import { Settings } from './model';
+import { ResetConfig, Settings } from './model';
 
 type Mode = 'widget' | 'popup' | 'editor';
 
 const OPACITY_STEPS = [1, 0.85, 0.7, 0.55];
+
+/** All IANA zones the runtime knows, with UTC first and the user's own zone guaranteed present. */
+function listTimeZones(): string[] {
+  const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const zones = Intl.supportedValuesOf?.('timeZone') ?? [];
+  return [...new Set(['UTC', local, ...zones])];
+}
 
 function readMode(): Mode {
   const hash = location.hash.replace('#', '');
@@ -28,6 +35,21 @@ export class App {
   constructor() {
     document.body.classList.add(`mode-${this.mode}`);
     this.store.api?.onPinned((p) => this.pinned.set(p));
+  }
+
+  protected readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  protected readonly timeZones = listTimeZones();
+
+  protected setReset(gameId: string, patch: Partial<ResetConfig>) {
+    this.store.dispatch({ type: 'game.setReset', gameId, patch });
+  }
+
+  protected localTime(at: number) {
+    return new Date(at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  protected localDay(at: number) {
+    return new Date(at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
   }
 
   protected update(patch: Partial<Settings>) {

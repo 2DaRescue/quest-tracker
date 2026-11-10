@@ -8,7 +8,11 @@ export class QuestStore {
   readonly available = !!this.api;
   readonly state = signal<AppState | null>(null);
 
+  /** Current time for countdowns; minute precision is plenty. */
+  readonly now = signal(Date.now());
+
   constructor() {
+    setInterval(() => this.now.set(Date.now()), 20_000);
     if (!this.api) return;
     this.api.getState().then((s) => this.state.set(s));
     this.api.onState((s) => this.state.set(s));

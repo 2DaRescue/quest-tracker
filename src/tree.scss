@@ -322,3 +322,46 @@ body.cdk-drag-active * {
   font-style: italic;
   padding: 0 4px 2px 14px;
 }
+
+// ---- resets ----
+
+.resets {
+  display: flex;
+  gap: 10px;
+  margin: -2px 0 2px 28px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cadence {
+  flex: none;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0;
+  text-align: center;
+  &.daily {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent);
+  }
+  &.weekly {
+    background: color-mix(in srgb, #7aa2f7 22%, transparent);
+    color: #7aa2f7;
+  }
+  &.none {
+    color: var(--muted);
+    opacity: 0;
+  }
+  &:hover {
+    outline: 1px solid currentColor;
+  }
+}
+
+.row:hover > .cadence.none {
+  opacity: 0.8;
+}

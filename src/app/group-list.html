@@ -14,6 +14,14 @@
         <span class="grip" cdkDragHandle title="Drag to reorder" (click)="$event.stopPropagation()">⠿</span>
         <span class="caret" [class.closed]="group.collapsed">▾</span>
         <qt-name [id]="group.id" [name]="group.name" />
+        <button
+          class="cadence"
+          [class]="'cadence ' + group.cadence"
+          [title]="cadenceTitle[group.cadence] + ' — click to change'"
+          (click)="$event.stopPropagation(); cycleCadence(group)"
+        >
+          {{ cadenceLabel[group.cadence] }}
+        </button>
         <span class="spacer"></span>
         <span class="bar" [style.--pct]="p.total ? p.done / p.total : 0"></span>
         <span class="count" [class.complete]="p.total && p.done === p.total">{{ p.done }}/{{ p.total }}</span>

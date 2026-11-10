@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Game, Group, dropIndex, gameProgress, groupProgress, taskProgress } from './model';
+import { Game, Group, dropIndex, formatCountdown, gameProgress, groupProgress, taskProgress } from './model';
+
+describe('formatCountdown', () => {
+  it('picks a compact unit', () => {
+    expect(formatCountdown(42 * 60_000)).toBe('42m');
+    expect(formatCountdown((5 * 60 + 12) * 60_000)).toBe('5h 12m');
+    expect(formatCountdown((2 * 24 + 4) * 3_600_000)).toBe('2d 4h');
+    expect(formatCountdown(-5000)).toBe('0m');
+  });
+});
 
 describe('dropIndex', () => {
   const items = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));
@@ -33,12 +42,15 @@ describe('progress', () => {
       id: 'x',
       name: 'Dailies',
       collapsed: false,
+      cadence: 'daily',
+      periodStart: null,
       tasks: [{ id: 't', name: 'D1', kind: 'check', checked: done }],
     });
     const game: Game = {
       id: 'g',
       name: 'Game',
       collapsed: false,
+      reset: { timezone: 'UTC', dailyTime: '00:00', weeklyDay: 1, weeklyTime: '00:00' },
       groups: [group(true)],
       characters: [
         { id: 'a', name: 'Main', collapsed: false, groups: [group(true)] },
@@ -53,6 +65,8 @@ describe('progress', () => {
       id: 'g',
       name: 'Weekly Bosses',
       collapsed: false,
+      cadence: 'weekly',
+      periodStart: null,
       tasks: Array.from({ length: 12 }, (_, i) => ({ id: `${i}`, name: `Boss ${i}`, kind: 'check' as const, checked: i < 7 })),
     };
     expect(groupProgress(bosses)).toEqual({ done: 7, total: 12 });

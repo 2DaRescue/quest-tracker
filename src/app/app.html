@@ -40,6 +40,40 @@
           Hide completed tasks
         </label>
 
+        <h2>Reset schedule</h2>
+        <p class="hint">Groups marked <b class="d">D</b> reset daily and <b class="w">W</b> weekly, at these times. Check each game's official reset time.</p>
+        @for (game of store.state()!.games; track game.id) {
+          <fieldset class="reset">
+            <legend>{{ game.name }}</legend>
+            <label>
+              <span>Time zone</span>
+              <select (change)="setReset(game.id, { timezone: $any($event.target).value })">
+                @for (tz of timeZones; track tz) {
+                  <option [value]="tz" [selected]="tz === game.reset.timezone">{{ tz }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Daily at</span>
+              <input type="time" [value]="game.reset.dailyTime" (change)="setReset(game.id, { dailyTime: $any($event.target).value })" />
+            </label>
+            <label>
+              <span>Weekly on</span>
+              <div class="pair">
+                <select (change)="setReset(game.id, { weeklyDay: +$any($event.target).value })">
+                  @for (day of weekdays; track $index) {
+                    <option [value]="$index" [selected]="$index === game.reset.weeklyDay">{{ day }}</option>
+                  }
+                </select>
+                <input type="time" [value]="game.reset.weeklyTime" (change)="setReset(game.id, { weeklyTime: $any($event.target).value })" />
+              </div>
+            </label>
+            @if (store.state()!.next[game.id]; as n) {
+              <p class="hint local">Your time: daily {{ localTime(n.daily) }} · weekly {{ localDay(n.weekly) }}</p>
+            }
+          </fieldset>
+        }
+
         <h2>System</h2>
         <label class="check">
           <input type="checkbox" [checked]="s.launchAtStartup" (change)="update({ launchAtStartup: $any($event.target).checked })" />

@@ -2,7 +2,7 @@ import { CdkDrag, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { Component, inject, input, signal } from '@angular/core';
 import { Board } from './board';
 import { Name } from './name';
-import { Character, Game, Task, TaskKind, groupProgress, isDone, taskProgress } from './model';
+import { Cadence, Character, Game, Group, Task, TaskKind, groupProgress, isDone, taskProgress } from './model';
 
 /** The groups belonging to one owner: a game's shared groups or a character's. */
 @Component({
@@ -23,6 +23,19 @@ export class GroupList {
 
   /** group whose "Copy to:" picker is open */
   protected readonly copyingId = signal<string | null>(null);
+
+  protected readonly cadenceLabel: Record<Cadence, string> = { daily: 'D', weekly: 'W', none: '–' };
+  protected readonly cadenceTitle: Record<Cadence, string> = {
+    daily: 'Resets daily',
+    weekly: 'Resets weekly',
+    none: 'Manual (never resets)',
+  };
+
+  protected cycleCadence(group: Group) {
+    const order: Cadence[] = ['none', 'daily', 'weekly'];
+    const cadence = order[(order.indexOf(group.cadence) + 1) % order.length];
+    this.store.dispatch({ type: 'group.setCadence', groupId: group.id, cadence });
+  }
 
   protected collapse(id: string) {
     this.store.dispatch({ type: 'node.toggleCollapse', id });

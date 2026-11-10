@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "dev": "concurrently -k -n ng,app -c yellow,cyan \"ng serve --port 4200\" \"wait-on http-get://localhost:4200 && electron . --dev\"",
-    "app": "ng build --base-href ./ && electron ."
+    "app": "ng build --base-href ./ && electron .",
+    "test:main": "node --test electron/"
   },
   "private": true,
   "packageManager": "npm@11.20.0",

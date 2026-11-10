@@ -12,6 +12,20 @@
           <button class="hover-btn danger" title="Delete game" (click)="$event.stopPropagation(); deleteNode(game.id, game.name, 'game')">×</button>
         </div>
 
+        @let used = cadencesUsed(game);
+        @let next = s.next[game.id];
+        @if (next && (used.has('daily') || used.has('weekly'))) {
+          <div class="resets">
+            ↻
+            @if (used.has('daily')) {
+              <span [title]="'Daily reset: ' + when(next.daily)">daily {{ countdown(next.daily) }}</span>
+            }
+            @if (used.has('weekly')) {
+              <span [title]="'Weekly reset: ' + when(next.weekly)">weekly {{ countdown(next.weekly) }}</span>
+            }
+          </div>
+        }
+
         @if (!game.collapsed) {
           <div class="children">
             <!-- Shared (account-wide) groups -->

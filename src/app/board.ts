@@ -3,7 +3,16 @@ import { Component, Injector, afterNextRender, computed, inject, signal } from '
 import { GroupList } from './group-list';
 import { Name } from './name';
 import { QuestStore } from './quest-store';
-import { Group, NodeKind, characterProgress, dropIndex, gameProgress, isDone } from './model';
+import {
+  Group,
+  NodeKind,
+  cadencesUsed,
+  characterProgress,
+  dropIndex,
+  formatCountdown,
+  gameProgress,
+  isDone,
+} from './model';
 
 /** The whole tree: games → (shared groups, characters → groups) → tasks. */
 @Component({
@@ -24,6 +33,16 @@ export class Board {
 
   protected readonly gameProgress = gameProgress;
   protected readonly characterProgress = characterProgress;
+  protected readonly cadencesUsed = cadencesUsed;
+
+  protected countdown(at: number) {
+    return formatCountdown(at - this.store.now());
+  }
+
+  /** Local display time of a reset, e.g. "Mon 9:00 AM". */
+  protected when(at: number) {
+    return new Date(at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  }
 
   private readonly games = computed(() => this.store.state()?.games ?? []);
   private readonly owners = computed(() => this.games().flatMap((g) => [g, ...g.characters]));

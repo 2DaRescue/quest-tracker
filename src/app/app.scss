@@ -112,12 +112,67 @@ h2 {
   margin: 0 0 10px 8px;
 }
 
+.reset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px 8px;
+  margin: 0 0 10px;
+  min-width: 0; // fieldsets default to min-content width, which overflows the sidebar
+
+  legend {
+    padding: 0 4px;
+    font-weight: 600;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  select,
+  input {
+    font: inherit;
+    color: var(--text);
+    background: var(--input);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 3px 5px;
+    min-width: 0;
+    color-scheme: dark;
+  }
+
+  .pair {
+    display: flex;
+    gap: 6px;
+    select {
+      flex: 1;
+    }
+  }
+
+  .local {
+    margin: 0;
+  }
+}
+
+b.d {
+  color: var(--accent);
+}
+b.w {
+  color: #7aa2f7;
+}
+
 .settings {
-  width: 220px;
+  width: 250px;
   flex: none;
   padding: 16px;
   border-left: 1px solid var(--line);
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 
   .hint {
     margin-left: 0;
